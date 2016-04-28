@@ -1,0 +1,10 @@
+[package]
+name = "ql2"
+description = "RethinkDB protocol"
+version = "1.0.0"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/rust-rethinkdb/ql2"
+authors = ["rushmorem <rushmore@webenchanter.com>"]
+
+[dependencies]
+protobuf = "1.0.18"
