@@ -2,8 +2,11 @@
 name = "ql2"
 description = "RethinkDB protocol"
 version = "1.0.0"
-license = "MIT OR Apache-2.0"
+license = "MIT/Apache-2.0"
 repository = "https://github.com/rust-rethinkdb/ql2"
+documentation = "http://rust-rethinkdb.github.io/ql2"
+readme = "README.md"
+keywords = ["database", "rethinkdb", "reql"]
 authors = ["rushmorem <rushmore@webenchanter.com>"]
 
 [dependencies]
