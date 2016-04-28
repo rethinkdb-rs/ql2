@@ -1,5 +1,4 @@
-// This file is generated. Do not edit
-// @generated
+//! RethinkDB protocol implementation in Rust. 
 
 #![allow(dead_code)]
 #![allow(non_camel_case_types)]
@@ -7,6 +6,10 @@
 #![allow(non_upper_case_globals)]
 #![allow(unused_imports)]
 
+extern crate protobuf;
+
+// All the code below is generated. Do not edit.
+// @generated
 use protobuf::Message as Message_imported_for_functions;
 use protobuf::ProtobufEnum as ProtobufEnum_imported_for_functions;
 
