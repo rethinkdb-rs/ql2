@@ -1,7 +1,7 @@
 [package]
 name = "ql2"
 description = "RethinkDB protocol"
-version = "1.0.0"
+version = "1.0.1"
 license = "MIT/Apache-2.0"
 repository = "https://github.com/rust-rethinkdb/ql2"
 documentation = "http://rust-rethinkdb.github.io/ql2/1.0.x/ql2"
