@@ -7,6 +7,7 @@ pub mod proto;
 
 use serde_json::value::{Value, ToJson};
 use protobuf::repeated::RepeatedField;
+use protobuf::ProtobufEnum;
 use proto::{
     Term, Datum,
     Datum_DatumType as DT,
@@ -16,6 +17,69 @@ use proto::{
 impl Term {
     fn is_empty(&self) -> bool {
         *self == Term::new()
+    }
+
+    fn is_datum(&self) -> bool {
+        self.get_field_type() == TT::DATUM
+    }
+
+    fn encode(&self) -> String {
+        let mut res = String::new();
+        if !self.is_datum() {
+            res.push_str(&format!("[{},", self.get_field_type().value()));
+        }
+        let terms = self.get_args();
+        if !terms.is_empty() {
+            let mut args = String::from("[");
+            for term in terms {
+                args.push_str(&format!("{},", term.encode()));
+            }
+            args = args.trim_right_matches(",").to_string();
+            args.push_str("]");
+            res.push_str(&args);
+        }
+        if self.has_datum() {
+            let datum = self.get_datum();
+            match datum.get_field_type() {
+                DT::R_NULL => {
+                    unimplemented!();
+                },
+                DT::R_BOOL => {
+                    if datum.has_r_bool() {
+                        res.push_str(&format!("{:?}", datum.get_r_bool()));
+                    } else {
+                        unimplemented!();
+                    }
+                },
+                DT::R_NUM => {
+                    if datum.has_r_num() {
+                        res.push_str(&format!("{}", datum.get_r_num()));
+                    } else {
+                        unimplemented!();
+                    }
+                },
+                DT::R_STR => {
+                    if datum.has_r_str() {
+                        res.push_str(&format!("{:?}", datum.get_r_str()));
+                    } else {
+                        unimplemented!();
+                    }
+                },
+                DT::R_ARRAY => {
+                    unimplemented!();
+                },
+                DT::R_OBJECT => {
+                    unimplemented!();
+                },
+                DT::R_JSON => {
+                    unimplemented!();
+                },
+            }
+        }
+        if !self.is_datum() {
+            res.push_str("]");
+        }
+        res
     }
 }
 
@@ -84,10 +148,10 @@ macro_rules! command {
             args.extend(list);
         }
         /*
-        if let Some(_opt) = $opts {
-            unimplemented!();
-        }
-        */
+           if let Some(_opt) = $opts {
+           unimplemented!();
+           }
+           */
         if !args.is_empty() {
             let args = RepeatedField::from_vec(args);
             term.set_args(args);
@@ -140,7 +204,7 @@ macro_rules! closure_arg {
 }
 
 pub trait Command
-    where Self: Sized + From<Term> + Into<Term>
+where Self: Sized + From<Term> + Into<Term>
 {
     fn db<T: ToTerm>(self, arg: T) -> Self {
         let cmd = self.into();
@@ -162,11 +226,11 @@ pub trait Command
 
     fn map<F>(self, func: F) -> Self
         where F: Fn(Self) -> Self
-    {
-        let cmd = self.into();
-        let arg = func(closure_par!()).into();
-        command!(TT::MAP, cmd, Some(vec![arg]), None)
-    }
+        {
+            let cmd = self.into();
+            let arg = func(closure_par!()).into();
+            command!(TT::MAP, cmd, Some(vec![arg]), None)
+        }
 
     fn array(self, arg: Vec<&ToTerm>) -> Self {
         let cmd = self.into();
@@ -182,5 +246,6 @@ fn test_commands_can_be_chained() {
     impl Command for Term { }
     let r = Term::new();
     let term = r.db("heroes").table("marvel").map(|row| row.get_field("first_appearance"));
-    panic!(format!("{:?}", term));
+    let term: Term = term.into();
+    panic!(format!("{:?}\n\n{}", term, term.encode()));
 }
