@@ -154,6 +154,12 @@ pub trait Command
         command!(TT::TABLE, cmd, Some(vec![arg]), None)
     }
 
+    fn get_field<T: ToTerm>(self, arg: T) -> Self {
+        let cmd = self.into();
+        let arg = arg.to_term();
+        command!(TT::GET_FIELD, cmd, Some(vec![arg]), None)
+    }
+
     fn map<F>(self, func: F) -> Self
         where F: Fn(Self) -> Self
     {
@@ -175,6 +181,6 @@ pub trait Command
 fn test_commands_can_be_chained() {
     impl Command for Term { }
     let r = Term::new();
-    let term = r.map(|row| row.db("heroes").table("marvel"));
+    let term = r.db("heroes").table("marvel").map(|row| row.get_field("first_appearance"));
     panic!(format!("{:?}", term));
 }
