@@ -235,6 +235,12 @@ macro_rules! closure_arg {
 pub trait Command
 where Self: Sized + From<Term> + Into<Term>
 {
+    fn expr<T>(self, arg: T) -> Self
+        where T: ToTerm
+    {
+        From::from(arg.to_term())
+    }
+
     fn db<T>(self, arg: T) -> Self
         where T: ToTerm
     {
@@ -242,11 +248,39 @@ where Self: Sized + From<Term> + Into<Term>
         command!(TT::DB, self, Some(vec![arg]), None)
     }
 
+    fn db_create<T>(self, arg: T) -> Self
+        where T: ToTerm
+    {
+        let arg = arg.to_term();
+        command!(TT::DB_CREATE, self, Some(vec![arg]), None)
+    }
+
+    fn db_drop<T>(self, arg: T) -> Self
+        where T: ToTerm
+    {
+        let arg = arg.to_term();
+        command!(TT::DB_DROP, self, Some(vec![arg]), None)
+    }
+
     fn table<T>(self, arg: T) -> Self
         where T: ToTerm
     {
         let arg = arg.to_term();
         command!(TT::TABLE, self, Some(vec![arg]), None)
+    }
+
+    fn table_create<T>(self, arg: T) -> Self
+        where T: ToTerm
+    {
+        let arg = arg.to_term();
+        command!(TT::TABLE_CREATE, self, Some(vec![arg]), None)
+    }
+
+    fn table_drop<T>(self, arg: T) -> Self
+        where T: ToTerm
+    {
+        let arg = arg.to_term();
+        command!(TT::TABLE_DROP, self, Some(vec![arg]), None)
     }
 
     fn get_field<T>(self, arg: T) -> Self
@@ -263,6 +297,13 @@ where Self: Sized + From<Term> + Into<Term>
             let arg = closure_arg!(res);
             command!(TT::MAP, self, Some(vec![arg]), None)
         }
+
+    fn object(self, arg: Vec<&ToTerm>) -> Self {
+        let args: Vec<Term> = arg.iter()
+            .map(|a| a.to_term())
+            .collect();
+        command!(TT::MAKE_OBJ, self, Some(args), None)
+    }
 
     fn array(self, arg: Vec<&ToTerm>) -> Self {
         let args: Vec<Term> = arg.iter()
