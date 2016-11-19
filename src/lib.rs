@@ -14,15 +14,69 @@ use proto::{
     Term_TermType as TT,
 };
 
-impl Term {
+impl IsEmpty for Term {
     fn is_empty(&self) -> bool {
         *self == Term::new()
     }
+}
 
+pub trait IsDatum {
+    fn is_datum(&self) -> bool;
+}
+
+impl IsDatum for Term {
     fn is_datum(&self) -> bool {
         self.get_field_type() == TT::DATUM
     }
+}
 
+impl Encode for Datum {
+    fn encode(&self) -> String {
+        match self.get_field_type() {
+            DT::R_NULL => {
+                unimplemented!();
+            },
+            DT::R_BOOL => {
+                if self.has_r_bool() {
+                    format!("{:?}", self.get_r_bool())
+                } else {
+                    unimplemented!();
+                }
+            },
+            DT::R_NUM => {
+                if self.has_r_num() {
+                    format!("{}", self.get_r_num())
+                } else {
+                    unimplemented!();
+                }
+            },
+            DT::R_STR => {
+                if self.has_r_str() {
+                    format!("{:?}", self.get_r_str())
+                } else {
+                    unimplemented!();
+                }
+            },
+            DT::R_ARRAY => {
+                let mut args = format!("[{},[", TT::MAKE_ARRAY.value());
+                for term in self.get_r_array() {
+                    args.push_str(&format!("{},", term.encode()));
+                }
+                args = args.trim_right_matches(",").to_string();
+                args.push_str("]]");
+                args
+            },
+            DT::R_OBJECT => {
+                unimplemented!();
+            },
+            DT::R_JSON => {
+                unimplemented!();
+            },
+        }
+    }
+}
+
+impl Encode for Term {
     fn encode(&self) -> String {
         let mut res = String::new();
         if !self.is_datum() {
@@ -40,47 +94,21 @@ impl Term {
         }
         if self.has_datum() {
             let datum = self.get_datum();
-            match datum.get_field_type() {
-                DT::R_NULL => {
-                    unimplemented!();
-                },
-                DT::R_BOOL => {
-                    if datum.has_r_bool() {
-                        res.push_str(&format!("{:?}", datum.get_r_bool()));
-                    } else {
-                        unimplemented!();
-                    }
-                },
-                DT::R_NUM => {
-                    if datum.has_r_num() {
-                        res.push_str(&format!("{}", datum.get_r_num()));
-                    } else {
-                        unimplemented!();
-                    }
-                },
-                DT::R_STR => {
-                    if datum.has_r_str() {
-                        res.push_str(&format!("{:?}", datum.get_r_str()));
-                    } else {
-                        unimplemented!();
-                    }
-                },
-                DT::R_ARRAY => {
-                    unimplemented!();
-                },
-                DT::R_OBJECT => {
-                    unimplemented!();
-                },
-                DT::R_JSON => {
-                    unimplemented!();
-                },
-            }
+            res.push_str(&datum.encode());
         }
         if !self.is_datum() {
             res.push_str("]");
         }
         res
     }
+}
+
+pub trait IsEmpty {
+    fn is_empty(&self) -> bool;
+}
+
+pub trait Encode {
+    fn encode(&self) -> String;
 }
 
 pub trait ToTerm {
@@ -141,8 +169,9 @@ macro_rules! command {
         let mut term = Term::new();
         term.set_field_type($T);
         let mut args = Vec::new();
-        if !$cmd.is_empty() {
-            args.push($cmd);
+        let cmd = $cmd.into();
+        if !cmd.is_empty() {
+            args.push(cmd);
         }
         if let Some(list) = $args {
             args.extend(list);
@@ -197,7 +226,7 @@ macro_rules! closure_arg {
         // FUNC
         let mut func = Term::new();
         func.set_field_type(TT::FUNC);
-        let args = RepeatedField::from_vec(vec![datum, $res]);
+        let args = RepeatedField::from_vec(vec![datum, $res.into()]);
         func.set_args(args);
         func
     }}
@@ -207,37 +236,33 @@ pub trait Command
 where Self: Sized + From<Term> + Into<Term>
 {
     fn db<T: ToTerm>(self, arg: T) -> Self {
-        let cmd = self.into();
         let arg = arg.to_term();
-        command!(TT::DB, cmd, Some(vec![arg]), None)
+        command!(TT::DB, self, Some(vec![arg]), None)
     }
 
     fn table<T: ToTerm>(self, arg: T) -> Self {
-        let cmd = self.into();
         let arg = arg.to_term();
-        command!(TT::TABLE, cmd, Some(vec![arg]), None)
+        command!(TT::TABLE, self, Some(vec![arg]), None)
     }
 
     fn get_field<T: ToTerm>(self, arg: T) -> Self {
-        let cmd = self.into();
         let arg = arg.to_term();
-        command!(TT::GET_FIELD, cmd, Some(vec![arg]), None)
+        command!(TT::GET_FIELD, self, Some(vec![arg]), None)
     }
 
     fn map<F>(self, func: F) -> Self
         where F: Fn(Self) -> Self
         {
-            let cmd = self.into();
-            let arg = func(closure_par!()).into();
-            command!(TT::MAP, cmd, Some(vec![arg]), None)
+            let res = func(closure_par!());
+            let arg = closure_arg!(res);
+            command!(TT::MAP, self, Some(vec![arg]), None)
         }
 
     fn array(self, arg: Vec<&ToTerm>) -> Self {
-        let cmd = self.into();
         let args: Vec<Term> = arg.iter()
             .map(|a| a.to_term())
             .collect();
-        command!(TT::MAKE_ARRAY, cmd, Some(args), None)
+        command!(TT::MAKE_ARRAY, self, Some(args), None)
     }
 }
 
