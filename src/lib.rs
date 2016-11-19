@@ -283,6 +283,93 @@ where Self: Sized + From<Term> + Into<Term>
         command!(TT::TABLE_DROP, self, Some(vec![arg]), None)
     }
 
+    fn index_create<T>(self, arg: T) -> Self
+        where T: ToTerm
+    {
+        let arg = arg.to_term();
+        command!(TT::INDEX_CREATE, self, Some(vec![arg]), None)
+    }
+
+    fn index_drop<T>(self, arg: T) -> Self
+        where T: ToTerm
+    {
+        let arg = arg.to_term();
+        command!(TT::INDEX_DROP, self, Some(vec![arg]), None)
+    }
+
+    fn replace<T>(self, arg: T) -> Self
+        where T: ToTerm
+    {
+        let arg = arg.to_term();
+        command!(TT::REPLACE, self, Some(vec![arg]), None)
+    }
+
+    fn update<T>(self, arg: T) -> Self
+        where T: ToTerm
+    {
+        let arg = arg.to_term();
+        command!(TT::UPDATE, self, Some(vec![arg]), None)
+    }
+
+    fn order_by<T>(self, arg: T) -> Self
+        where T: ToTerm
+    {
+        let arg = arg.to_term();
+        command!(TT::ORDER_BY, self, Some(vec![arg]), None)
+    }
+
+    fn without<T>(self, arg: T) -> Self
+        where T: ToTerm
+    {
+        let arg = arg.to_term();
+        command!(TT::WITHOUT, self, Some(vec![arg]), None)
+    }
+
+    fn contains<T>(self, arg: T) -> Self
+        where T: ToTerm
+    {
+        let arg = arg.to_term();
+        command!(TT::CONTAINS, self, Some(vec![arg]), None)
+    }
+
+    fn limit<T>(self, arg: T) -> Self
+        where T: ToTerm
+    {
+        let arg = arg.to_term();
+        command!(TT::LIMIT, self, Some(vec![arg]), None)
+    }
+
+    fn get<T>(self, arg: T) -> Self
+        where T: ToTerm
+    {
+        let arg = arg.to_term();
+        command!(TT::GET, self, Some(vec![arg]), None)
+    }
+
+    fn get_all<T>(self, arg: T) -> Self
+        where T: ToTerm
+    {
+        let arg = arg.to_term();
+        command!(TT::GET_ALL, self, Some(vec![arg]), None)
+    }
+
+    fn insert<T>(self, arg: T) -> Self
+        where T: ToTerm
+    {
+        let arg = arg.to_term();
+        command!(TT::INSERT, self, Some(vec![arg]), None)
+    }
+
+    fn delete(self) -> Self
+    {
+        command!(TT::DELETE, self, None as Option<Vec<Term>>, None)
+    }
+
+    fn changes(self) -> Self
+    {
+        command!(TT::CHANGES, self, None as Option<Vec<Term>>, None)
+    }
+
     fn get_field<T>(self, arg: T) -> Self
         where T: ToTerm
     {
@@ -290,13 +377,21 @@ where Self: Sized + From<Term> + Into<Term>
         command!(TT::GET_FIELD, self, Some(vec![arg]), None)
     }
 
+    fn filter<F>(self, func: F) -> Self
+        where F: Fn(Self) -> Self
+    {
+        let res = func(closure_par!());
+        let arg = closure_arg!(res);
+        command!(TT::FILTER, self, Some(vec![arg]), None)
+    }
+
     fn map<F>(self, func: F) -> Self
         where F: Fn(Self) -> Self
-        {
-            let res = func(closure_par!());
-            let arg = closure_arg!(res);
-            command!(TT::MAP, self, Some(vec![arg]), None)
-        }
+    {
+        let res = func(closure_par!());
+        let arg = closure_arg!(res);
+        command!(TT::MAP, self, Some(vec![arg]), None)
+    }
 
     fn object(self, arg: Vec<&ToTerm>) -> Self {
         let args: Vec<Term> = arg.iter()
