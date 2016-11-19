@@ -235,17 +235,23 @@ macro_rules! closure_arg {
 pub trait Command
 where Self: Sized + From<Term> + Into<Term>
 {
-    fn db<T: ToTerm>(self, arg: T) -> Self {
+    fn db<T>(self, arg: T) -> Self
+        where T: ToTerm
+    {
         let arg = arg.to_term();
         command!(TT::DB, self, Some(vec![arg]), None)
     }
 
-    fn table<T: ToTerm>(self, arg: T) -> Self {
+    fn table<T>(self, arg: T) -> Self
+        where T: ToTerm
+    {
         let arg = arg.to_term();
         command!(TT::TABLE, self, Some(vec![arg]), None)
     }
 
-    fn get_field<T: ToTerm>(self, arg: T) -> Self {
+    fn get_field<T>(self, arg: T) -> Self
+        where T: ToTerm
+    {
         let arg = arg.to_term();
         command!(TT::GET_FIELD, self, Some(vec![arg]), None)
     }
