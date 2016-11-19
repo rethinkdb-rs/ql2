@@ -14,19 +14,31 @@ use proto::{
     Term_TermType as TT,
 };
 
-impl IsEmpty for Term {
-    fn is_empty(&self) -> bool {
-        *self == Term::new()
-    }
-}
-
 pub trait IsDatum {
     fn is_datum(&self) -> bool;
+}
+
+pub trait IsEmpty {
+    fn is_empty(&self) -> bool;
+}
+
+pub trait Encode {
+    fn encode(&self) -> String;
+}
+
+pub trait ToTerm {
+    fn to_term(&self) -> Term;
 }
 
 impl IsDatum for Term {
     fn is_datum(&self) -> bool {
         self.get_field_type() == TT::DATUM
+    }
+}
+
+impl IsEmpty for Term {
+    fn is_empty(&self) -> bool {
+        *self == Term::new()
     }
 }
 
@@ -101,18 +113,6 @@ impl Encode for Term {
         }
         res
     }
-}
-
-pub trait IsEmpty {
-    fn is_empty(&self) -> bool;
-}
-
-pub trait Encode {
-    fn encode(&self) -> String;
-}
-
-pub trait ToTerm {
-    fn to_term(&self) -> Term;
 }
 
 impl<T: ToJson> ToTerm for T {
