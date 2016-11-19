@@ -10,4 +10,5 @@ keywords = ["database", "rethinkdb", "reql"]
 authors = ["rushmorem <rushmore@webenchanter.com>"]
 
 [dependencies]
-protobuf = "1.0.18"
+protobuf = "1.0"
+serde_json = "0.8"
