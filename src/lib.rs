@@ -12,7 +12,72 @@ use proto::{
     Term, Datum,
     Datum_DatumType as DT,
     Term_TermType as TT,
+    Term_AssocPair as TA,
 };
+
+macro_rules! command {
+    ($T:expr, $cmd:expr, $args:expr) => {{
+        let mut term = Term::new();
+        term.set_field_type($T);
+        let mut args = Vec::new();
+        let cmd = $cmd.to();
+        if !cmd.is_empty() {
+            args.push(cmd);
+        }
+        if let Some(list) = $args {
+            args.extend(list);
+        }
+        if !args.is_empty() {
+            let args = RepeatedField::from_vec(args);
+            term.set_args(args);
+        }
+        FromTerm::from(term)
+    }}
+}
+
+macro_rules! closure_par {
+    () => {{
+        // ID
+        let mut id = Datum::new();
+        id.set_field_type(DT::R_NUM);
+        id.set_r_num(1.0);
+        // DATUM
+        let mut datum = Term::new();
+        datum.set_field_type(TT::DATUM);
+        datum.set_datum(id);
+        // VAR
+        let mut var = Term::new();
+        var.set_field_type(TT::VAR);
+        let args = RepeatedField::from_vec(vec![datum]);
+        var.set_args(args);
+        var
+    }}
+}
+
+macro_rules! closure_arg {
+    ($func:expr) => {{
+        // ID
+        let mut id = Datum::new();
+        id.set_field_type(DT::R_NUM);
+        id.set_r_num(1.0);
+        // ARRAY
+        let mut array = Datum::new();
+        array.set_field_type(DT::R_ARRAY);
+        let args = RepeatedField::from_vec(vec![id]);
+        array.set_r_array(args);
+        // DATUM
+        let mut datum = Term::new();
+        datum.set_field_type(TT::DATUM);
+        datum.set_datum(array);
+        // FUNC
+        let mut func = Term::new();
+        func.set_field_type(TT::FUNC);
+        let res = $func(closure_par!());
+        let args = RepeatedField::from_vec(vec![datum, res]);
+        func.set_args(args);
+        vec![func]
+    }}
+}
 
 pub type Array = Vec<Value>;
 
@@ -178,248 +243,188 @@ impl FromTerm for Term {
     }
 }
 
-macro_rules! command {
-    ($T:expr, $cmd:expr, $args:expr, $opts:expr) => {{
-        let mut term = Term::new();
-        term.set_field_type($T);
-        let mut args = Vec::new();
-        let cmd = $cmd.to();
-        if !cmd.is_empty() {
-            args.push(cmd);
-        }
-        if let Some(list) = $args {
-            args.extend(list);
-        }
-        /*
-           if let Some(_opt) = $opts {
-           unimplemented!();
-           }
-           */
-        if !args.is_empty() {
-            let args = RepeatedField::from_vec(args);
-            term.set_args(args);
-        }
-        FromTerm::from(term)
-    }}
-}
-
-macro_rules! closure_par {
-    () => {{
-        // ID
-        let mut id = Datum::new();
-        id.set_field_type(DT::R_NUM);
-        id.set_r_num(1.0);
-        // DATUM
-        let mut datum = Term::new();
-        datum.set_field_type(TT::DATUM);
-        datum.set_datum(id);
-        // VAR
-        let mut var = Term::new();
-        var.set_field_type(TT::VAR);
-        let args = RepeatedField::from_vec(vec![datum]);
-        var.set_args(args);
-        FromTerm::from(var)
-    }}
-}
-
-macro_rules! closure_arg {
-    ($res:expr) => {{
-        // ID
-        let mut id = Datum::new();
-        id.set_field_type(DT::R_NUM);
-        id.set_r_num(1.0);
-        // ARRAY
-        let mut array = Datum::new();
-        array.set_field_type(DT::R_ARRAY);
-        let args = RepeatedField::from_vec(vec![id]);
-        array.set_r_array(args);
-        // DATUM
-        let mut datum = Term::new();
-        datum.set_field_type(TT::DATUM);
-        datum.set_datum(array);
-        // FUNC
-        let mut func = Term::new();
-        func.set_field_type(TT::FUNC);
-        let args = RepeatedField::from_vec(vec![datum, $res.to()]);
-        func.set_args(args);
-        func
-    }}
-}
-
 pub trait Command : FromTerm + ToTerm {
-    fn expr<T>(&self, arg: T) -> Self
+    fn expr<T>(self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         FromTerm::from(arg.to())
     }
 
-    fn db<T>(&self, arg: T) -> Self
+    fn db<T>(self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        command!(TT::DB, self, Some(vec![arg.to()]), None)
+        command!(TT::DB, self, Some(vec![arg.to()]))
     }
 
-    fn db_create<T>(&self, arg: T) -> Self
+    fn db_create<T>(self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        command!(TT::DB_CREATE, self, Some(vec![arg.to()]), None)
+        command!(TT::DB_CREATE, self, Some(vec![arg.to()]))
     }
 
-    fn db_drop<T>(&self, arg: T) -> Self
+    fn db_drop<T>(self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        command!(TT::DB_DROP, self, Some(vec![arg.to()]), None)
+        command!(TT::DB_DROP, self, Some(vec![arg.to()]))
     }
 
-    fn table<T>(&self, arg: T) -> Self
+    fn table<T>(self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        command!(TT::TABLE, self, Some(vec![arg.to()]), None)
+        command!(TT::TABLE, self, Some(vec![arg.to()]))
     }
 
-    fn table_create<T>(&self, arg: T) -> Self
+    fn table_create<T>(self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        command!(TT::TABLE_CREATE, self, Some(vec![arg.to()]), None)
+        command!(TT::TABLE_CREATE, self, Some(vec![arg.to()]))
     }
 
-    fn table_drop<T>(&self, arg: T) -> Self
+    fn table_drop<T>(self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        command!(TT::TABLE_DROP, self, Some(vec![arg.to()]), None)
+        command!(TT::TABLE_DROP, self, Some(vec![arg.to()]))
     }
 
-    fn index_create<T>(&self, arg: T) -> Self
+    fn index_create<T>(self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        command!(TT::INDEX_CREATE, self, Some(vec![arg.to()]), None)
+        command!(TT::INDEX_CREATE, self, Some(vec![arg.to()]))
     }
 
-    fn index_drop<T>(&self, arg: T) -> Self
+    fn index_drop<T>(self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        command!(TT::INDEX_DROP, self, Some(vec![arg.to()]), None)
+        command!(TT::INDEX_DROP, self, Some(vec![arg.to()]))
     }
 
-    fn replace<T>(&self, arg: T) -> Self
+    fn replace<T>(self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        command!(TT::REPLACE, self, Some(vec![arg.to()]), None)
+        command!(TT::REPLACE, self, Some(vec![arg.to()]))
     }
 
-    fn update<T>(&self, arg: T) -> Self
+    fn update<T>(self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        command!(TT::UPDATE, self, Some(vec![arg.to()]), None)
+        command!(TT::UPDATE, self, Some(vec![arg.to()]))
     }
 
-    fn order_by<T>(&self, arg: T) -> Self
+    fn order_by<T>(self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        command!(TT::ORDER_BY, self, Some(vec![arg.to()]), None)
+        command!(TT::ORDER_BY, self, Some(vec![arg.to()]))
     }
 
-    fn without<T>(&self, arg: T) -> Self
+    fn without<T>(self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        command!(TT::WITHOUT, self, Some(vec![arg.to()]), None)
+        command!(TT::WITHOUT, self, Some(vec![arg.to()]))
     }
 
-    fn contains<T>(&self, arg: T) -> Self
+    fn contains<T>(self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        command!(TT::CONTAINS, self, Some(vec![arg.to()]), None)
+        command!(TT::CONTAINS, self, Some(vec![arg.to()]))
     }
 
-    fn limit<T>(&self, arg: T) -> Self
+    fn limit<T>(self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        command!(TT::LIMIT, self, Some(vec![arg.to()]), None)
+        command!(TT::LIMIT, self, Some(vec![arg.to()]))
     }
 
-    fn get<T>(&self, arg: T) -> Self
+    fn get<T>(self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        command!(TT::GET, self, Some(vec![arg.to()]), None)
+        command!(TT::GET, self, Some(vec![arg.to()]))
     }
 
-    fn get_all<T>(&self, arg: T) -> Self
+    fn get_all<T>(self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        command!(TT::GET_ALL, self, Some(vec![arg.to()]), None)
+        command!(TT::GET_ALL, self, Some(vec![arg.to()]))
     }
 
-    fn insert<T>(&self, arg: T) -> Self
+    fn opt_arg<T>(self, name: &str, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        command!(TT::INSERT, self, Some(vec![arg.to()]), None)
+        let mut opt = TA::new();
+        opt.set_key(name.into());
+        opt.set_val(arg.to());
+        let arg = RepeatedField::from_vec(vec![opt]);
+        let mut term = self.to();
+        term.set_optargs(arg);
+        FromTerm::from(term)
     }
 
-    fn delete(&self) -> Self
+    fn insert<T>(self, arg: T) -> Self
+        where T: ToTerm, Self: Sized
+    {
+        command!(TT::INSERT, self, Some(vec![arg.to()]))
+    }
+
+    fn delete(self) -> Self
         where Self: Sized
     {
-        command!(TT::DELETE, self, None as Option<Vec<Term>>, None)
+        command!(TT::DELETE, self, None as Option<Vec<Term>>)
     }
 
-    fn changes(&self) -> Self
+    fn changes(self) -> Self
         where Self: Sized
     {
-        command!(TT::CHANGES, self, None as Option<Vec<Term>>, None)
+        command!(TT::CHANGES, self, None as Option<Vec<Term>>)
     }
 
-    fn has_fields<T>(&self, arg: T) -> Self
+    fn has_fields<T>(self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        command!(TT::HAS_FIELDS, self, Some(vec![arg.to()]), None)
+        command!(TT::HAS_FIELDS, self, Some(vec![arg.to()]))
     }
 
-    fn get_field<T>(&self, arg: T) -> Self
+    fn get_field<T>(self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        command!(TT::GET_FIELD, self, Some(vec![arg.to()]), None)
+        command!(TT::GET_FIELD, self, Some(vec![arg.to()]))
     }
 
-    fn filter<F>(&self, func: F) -> Self
-        where F: Fn(Self) -> Self, Self: Sized
+    fn filter<F>(self, func: F) -> Self
+        where F: FnOnce(Term) -> Term, Self: Sized
     {
-        let res = func(closure_par!());
-        let term = closure_arg!(res);
-        command!(TT::FILTER, self, Some(vec![term]), None)
+        command!(TT::FILTER, self, Some(closure_arg!(func)))
     }
 
-    fn map<F>(&self, func: F) -> Self
-        where F: Fn(Self) -> Self, Self: Sized
+    fn map<F>(self, func: F) -> Self
+        where F: FnOnce(Term) -> Term, Self: Sized
     {
-        let res = func(closure_par!());
-        let term = closure_arg!(res);
-        command!(TT::MAP, self, Some(vec![term]), None)
+        command!(TT::MAP, self, Some(closure_arg!(func)))
     }
 
-    fn branch<T, O>(&self, arg: T) -> Self
+    fn branch<T, O>(self, arg: T) -> Self
         where O: ToTerm + Sized, T: IntoIterator<Item=O>, Self: Sized
     {
         let args: Vec<Term> = arg.into_iter()
             .map(|a| a.to())
             .collect();
-        command!(TT::BRANCH, self, Some(args), None)
+        command!(TT::BRANCH, self, Some(args))
     }
 
-    fn object<T, O>(&self, arg: T) -> Self
+    fn object<T, O>(self, arg: T) -> Self
         where O: ToTerm + Sized, T: IntoIterator<Item=O>, Self: Sized
     {
         let args: Vec<Term> = arg.into_iter()
             .map(|a| a.to())
             .collect();
-        command!(TT::MAKE_OBJ, self, Some(args), None)
+        command!(TT::MAKE_OBJ, self, Some(args))
     }
 
-    fn array<T, O>(&self, arg: T) -> Self
+    fn array<T, O>(self, arg: T) -> Self
         where O: ToTerm + Sized, T: IntoIterator<Item=O>, Self: Sized
     {
         let args: Vec<Term> = arg.into_iter()
             .map(|a| a.to())
             .collect();
-        command!(TT::MAKE_ARRAY, self, Some(args), None)
+        command!(TT::MAKE_ARRAY, self, Some(args))
     }
 }
 
