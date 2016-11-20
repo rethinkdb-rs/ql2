@@ -252,120 +252,120 @@ pub trait Command : FromTerm + ToTerm {
     fn db<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let arg = arg.to();
-        command!(TT::DB, self, Some(vec![arg]), None)
+        let term = arg.to();
+        command!(TT::DB, self, Some(vec![term]), None)
     }
 
     fn db_create<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let arg = arg.to();
-        command!(TT::DB_CREATE, self, Some(vec![arg]), None)
+        let term = arg.to();
+        command!(TT::DB_CREATE, self, Some(vec![term]), None)
     }
 
     fn db_drop<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let arg = arg.to();
-        command!(TT::DB_DROP, self, Some(vec![arg]), None)
+        let term = arg.to();
+        command!(TT::DB_DROP, self, Some(vec![term]), None)
     }
 
     fn table<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let arg = arg.to();
-        command!(TT::TABLE, self, Some(vec![arg]), None)
+        let term = arg.to();
+        command!(TT::TABLE, self, Some(vec![term]), None)
     }
 
     fn table_create<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let arg = arg.to();
-        command!(TT::TABLE_CREATE, self, Some(vec![arg]), None)
+        let term = arg.to();
+        command!(TT::TABLE_CREATE, self, Some(vec![term]), None)
     }
 
     fn table_drop<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let arg = arg.to();
-        command!(TT::TABLE_DROP, self, Some(vec![arg]), None)
+        let term = arg.to();
+        command!(TT::TABLE_DROP, self, Some(vec![term]), None)
     }
 
     fn index_create<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let arg = arg.to();
-        command!(TT::INDEX_CREATE, self, Some(vec![arg]), None)
+        let term = arg.to();
+        command!(TT::INDEX_CREATE, self, Some(vec![term]), None)
     }
 
     fn index_drop<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let arg = arg.to();
-        command!(TT::INDEX_DROP, self, Some(vec![arg]), None)
+        let term = arg.to();
+        command!(TT::INDEX_DROP, self, Some(vec![term]), None)
     }
 
     fn replace<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let arg = arg.to();
-        command!(TT::REPLACE, self, Some(vec![arg]), None)
+        let term = arg.to();
+        command!(TT::REPLACE, self, Some(vec![term]), None)
     }
 
     fn update<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let arg = arg.to();
-        command!(TT::UPDATE, self, Some(vec![arg]), None)
+        let term = arg.to();
+        command!(TT::UPDATE, self, Some(vec![term]), None)
     }
 
     fn order_by<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let arg = arg.to();
-        command!(TT::ORDER_BY, self, Some(vec![arg]), None)
+        let term = arg.to();
+        command!(TT::ORDER_BY, self, Some(vec![term]), None)
     }
 
     fn without<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let arg = arg.to();
-        command!(TT::WITHOUT, self, Some(vec![arg]), None)
+        let term = arg.to();
+        command!(TT::WITHOUT, self, Some(vec![term]), None)
     }
 
     fn contains<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let arg = arg.to();
-        command!(TT::CONTAINS, self, Some(vec![arg]), None)
+        let term = arg.to();
+        command!(TT::CONTAINS, self, Some(vec![term]), None)
     }
 
     fn limit<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let arg = arg.to();
-        command!(TT::LIMIT, self, Some(vec![arg]), None)
+        let term = arg.to();
+        command!(TT::LIMIT, self, Some(vec![term]), None)
     }
 
     fn get<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let arg = arg.to();
-        command!(TT::GET, self, Some(vec![arg]), None)
+        let term = arg.to();
+        command!(TT::GET, self, Some(vec![term]), None)
     }
 
     fn get_all<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let arg = arg.to();
-        command!(TT::GET_ALL, self, Some(vec![arg]), None)
+        let term = arg.to();
+        command!(TT::GET_ALL, self, Some(vec![term]), None)
     }
 
     fn insert<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let arg = arg.to();
-        command!(TT::INSERT, self, Some(vec![arg]), None)
+        let term = arg.to();
+        command!(TT::INSERT, self, Some(vec![term]), None)
     }
 
     fn delete(&self) -> Self
@@ -383,31 +383,31 @@ pub trait Command : FromTerm + ToTerm {
     fn has_fields<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let arg = arg.to();
-        command!(TT::HAS_FIELDS, self, Some(vec![arg]), None)
+        let term = arg.to();
+        command!(TT::HAS_FIELDS, self, Some(vec![term]), None)
     }
 
     fn get_field<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let arg = arg.to();
-        command!(TT::GET_FIELD, self, Some(vec![arg]), None)
+        let term = arg.to();
+        command!(TT::GET_FIELD, self, Some(vec![term]), None)
     }
 
     fn filter<F>(&self, func: F) -> Self
         where F: Fn(Self) -> Self, Self: Sized
     {
         let res = func(closure_par!());
-        let arg = closure_arg!(res);
-        command!(TT::FILTER, self, Some(vec![arg]), None)
+        let term = closure_arg!(res);
+        command!(TT::FILTER, self, Some(vec![term]), None)
     }
 
     fn map<F>(&self, func: F) -> Self
         where F: Fn(Self) -> Self, Self: Sized
     {
         let res = func(closure_par!());
-        let arg = closure_arg!(res);
-        command!(TT::MAP, self, Some(vec![arg]), None)
+        let term = closure_arg!(res);
+        command!(TT::MAP, self, Some(vec![term]), None)
     }
 
     fn branch<T, O>(&self, arg: T) -> Self
