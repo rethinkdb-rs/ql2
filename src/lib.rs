@@ -252,120 +252,103 @@ pub trait Command : FromTerm + ToTerm {
     fn db<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let term = arg.to();
-        command!(TT::DB, self, Some(vec![term]), None)
+        command!(TT::DB, self, Some(vec![arg.to()]), None)
     }
 
     fn db_create<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let term = arg.to();
-        command!(TT::DB_CREATE, self, Some(vec![term]), None)
+        command!(TT::DB_CREATE, self, Some(vec![arg.to()]), None)
     }
 
     fn db_drop<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let term = arg.to();
-        command!(TT::DB_DROP, self, Some(vec![term]), None)
+        command!(TT::DB_DROP, self, Some(vec![arg.to()]), None)
     }
 
     fn table<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let term = arg.to();
-        command!(TT::TABLE, self, Some(vec![term]), None)
+        command!(TT::TABLE, self, Some(vec![arg.to()]), None)
     }
 
     fn table_create<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let term = arg.to();
-        command!(TT::TABLE_CREATE, self, Some(vec![term]), None)
+        command!(TT::TABLE_CREATE, self, Some(vec![arg.to()]), None)
     }
 
     fn table_drop<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let term = arg.to();
-        command!(TT::TABLE_DROP, self, Some(vec![term]), None)
+        command!(TT::TABLE_DROP, self, Some(vec![arg.to()]), None)
     }
 
     fn index_create<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let term = arg.to();
-        command!(TT::INDEX_CREATE, self, Some(vec![term]), None)
+        command!(TT::INDEX_CREATE, self, Some(vec![arg.to()]), None)
     }
 
     fn index_drop<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let term = arg.to();
-        command!(TT::INDEX_DROP, self, Some(vec![term]), None)
+        command!(TT::INDEX_DROP, self, Some(vec![arg.to()]), None)
     }
 
     fn replace<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let term = arg.to();
-        command!(TT::REPLACE, self, Some(vec![term]), None)
+        command!(TT::REPLACE, self, Some(vec![arg.to()]), None)
     }
 
     fn update<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let term = arg.to();
-        command!(TT::UPDATE, self, Some(vec![term]), None)
+        command!(TT::UPDATE, self, Some(vec![arg.to()]), None)
     }
 
     fn order_by<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let term = arg.to();
-        command!(TT::ORDER_BY, self, Some(vec![term]), None)
+        command!(TT::ORDER_BY, self, Some(vec![arg.to()]), None)
     }
 
     fn without<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let term = arg.to();
-        command!(TT::WITHOUT, self, Some(vec![term]), None)
+        command!(TT::WITHOUT, self, Some(vec![arg.to()]), None)
     }
 
     fn contains<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let term = arg.to();
-        command!(TT::CONTAINS, self, Some(vec![term]), None)
+        command!(TT::CONTAINS, self, Some(vec![arg.to()]), None)
     }
 
     fn limit<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let term = arg.to();
-        command!(TT::LIMIT, self, Some(vec![term]), None)
+        command!(TT::LIMIT, self, Some(vec![arg.to()]), None)
     }
 
     fn get<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let term = arg.to();
-        command!(TT::GET, self, Some(vec![term]), None)
+        command!(TT::GET, self, Some(vec![arg.to()]), None)
     }
 
     fn get_all<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let term = arg.to();
-        command!(TT::GET_ALL, self, Some(vec![term]), None)
+        command!(TT::GET_ALL, self, Some(vec![arg.to()]), None)
     }
 
     fn insert<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let term = arg.to();
-        command!(TT::INSERT, self, Some(vec![term]), None)
+        command!(TT::INSERT, self, Some(vec![arg.to()]), None)
     }
 
     fn delete(&self) -> Self
@@ -383,15 +366,13 @@ pub trait Command : FromTerm + ToTerm {
     fn has_fields<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let term = arg.to();
-        command!(TT::HAS_FIELDS, self, Some(vec![term]), None)
+        command!(TT::HAS_FIELDS, self, Some(vec![arg.to()]), None)
     }
 
     fn get_field<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
-        let term = arg.to();
-        command!(TT::GET_FIELD, self, Some(vec![term]), None)
+        command!(TT::GET_FIELD, self, Some(vec![arg.to()]), None)
     }
 
     fn filter<F>(&self, func: F) -> Self
