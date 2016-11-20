@@ -5,7 +5,7 @@ extern crate serde_json;
 
 pub mod proto;
 
-use serde_json::value::{Value, ToJson};
+use serde_json::value::{Value, Map, ToJson};
 use protobuf::repeated::RepeatedField;
 use protobuf::ProtobufEnum;
 use proto::{
@@ -13,6 +13,10 @@ use proto::{
     Datum_DatumType as DT,
     Term_TermType as TT,
 };
+
+pub type Array = Vec<Value>;
+
+pub type Object = Map<String, Value>;
 
 pub trait IsDatum {
     fn is_datum(&self) -> bool;
