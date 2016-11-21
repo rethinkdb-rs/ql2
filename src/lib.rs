@@ -98,6 +98,10 @@ pub trait Encode {
     fn encode(&self) -> String;
 }
 
+pub trait Decode {
+    fn decode(&self) -> Value;
+}
+
 pub trait ToTerm {
     fn to_term(&self) -> Term;
 }
@@ -180,6 +184,18 @@ impl IsEmpty for Term {
     }
 }
 
+impl Encode for Vec<TA> {
+    fn encode(&self) -> String {
+        let mut opts = String::from("{");
+        for term in self {
+            opts.push_str(&format!("{:?}:{},", term.get_key(), term.get_val().encode()));
+        }
+        opts = opts.trim_right_matches(",").to_string();
+        opts.push_str("}");
+        opts
+    }
+}
+
 impl Encode for Datum {
     fn encode(&self) -> String {
         match self.get_field_type() {
@@ -219,7 +235,7 @@ impl Encode for Datum {
             DT::R_OBJECT => {
                 let mut args = String::from("{");
                 for term in self.get_r_object() {
-                    args.push_str(&format!("{:?}: {},", term.get_key(), term.get_val().encode()));
+                    args.push_str(&format!("{:?}:{},", term.get_key(), term.get_val().encode()));
                 }
                 args = args.trim_right_matches(",").to_string();
                 args.push_str("}");
@@ -238,6 +254,10 @@ impl Encode for Term {
         if !self.is_datum() {
             res.push_str(&format!("[{},", self.get_field_type().value()));
         }
+        if self.has_datum() {
+            let datum = self.get_datum();
+            res.push_str(&datum.encode());
+        }
         let terms = self.get_args();
         if !terms.is_empty() {
             let mut args = String::from("[");
@@ -248,9 +268,9 @@ impl Encode for Term {
             args.push_str("]");
             res.push_str(&args);
         }
-        if self.has_datum() {
-            let datum = self.get_datum();
-            res.push_str(&datum.encode());
+        let opts = self.clone().take_optargs().into_vec();
+        if !opts.is_empty() {
+            res.push_str(&format!(",{}", opts.encode()));
         }
         if !self.is_datum() {
             res.push_str("]");
@@ -323,19 +343,33 @@ impl ToTerm for Term {
     }
 }
 
+pub fn find_datum(mut t: Term) -> Option<Datum> {
+    if t.has_datum() {
+        return Some(t.take_datum());
+    }
+    for arg in t.take_args().into_vec() {
+        let datum = find_datum(arg);
+        if datum.is_some() {
+            return datum;
+        }
+    }
+    None
+}
+
 impl From<BTreeMap<String, Term>> for Term {
     fn from(t: BTreeMap<String, Term>) -> Term {
         // Datum
         let mut datum = Datum::new();
         datum.set_field_type(DT::R_OBJECT);
-        let args: Vec<DA> = t.into_iter()
-            .map(|(name, mut arg)| {
+        let mut args = Vec::new();
+        for (name, arg) in t.into_iter() {
+            if let Some(val) = find_datum(arg) {
                 let mut obj = DA::new();
                 obj.set_key(name.into());
-                obj.set_val(arg.take_datum());
-                obj
-            })
-        .collect();
+                obj.set_val(val);
+                args.push(obj);
+            }
+        }
         let obj = RepeatedField::from_vec(args);
         datum.set_r_object(obj);
         // Term
@@ -560,7 +594,6 @@ pub trait Command : FromTerm + ToTerm {
 fn test_commands_can_be_chained() {
     impl Command for Term { }
     let r = Term::new();
-    //let term = r.db("heroes").table("marvel").map(|row| row.get_field("first_appearance"));
-    let term = r.table("marvel").map(|row| row.get_field("first_appearance"));
+    let term = r.db("heroes").table("marvel").map(|row| row.get_field("first_appearance"));
     panic!(format!("{:?}\n\n{}\n\n{:?}", term, term.encode(), term.info()));
 }
