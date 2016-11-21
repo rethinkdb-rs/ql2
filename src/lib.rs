@@ -5,14 +5,17 @@ extern crate serde_json;
 
 pub mod proto;
 
+use std::collections::BTreeMap;
+
 use serde_json::value::{Value, Map, ToJson};
 use protobuf::repeated::RepeatedField;
 use protobuf::ProtobufEnum;
 use proto::{
     Term, Datum,
-    Datum_DatumType as DT,
     Term_TermType as TT,
     Term_AssocPair as TA,
+    Datum_DatumType as DT,
+    Datum_AssocPair as DA
 };
 
 macro_rules! command {
@@ -152,7 +155,13 @@ impl Encode for Datum {
                 args
             },
             DT::R_OBJECT => {
-                unimplemented!();
+                let mut args = String::from("{");
+                for term in self.get_r_object() {
+                    args.push_str(&format!("{:?}: {},", term.get_key(), term.get_val().encode()));
+                }
+                args = args.trim_right_matches(",").to_string();
+                args.push_str("}");
+                args
             },
             DT::R_JSON => {
                 unimplemented!();
@@ -213,11 +222,26 @@ impl<T: ToJson> ToTerm for T {
                 datum.set_field_type(DT::R_NUM);
                 datum.set_r_num(val);
             },
-            Value::Array(_val) => {
-                unimplemented!();
+            Value::Array(val) => {
+                datum.set_field_type(DT::R_ARRAY);
+                let args: Vec<Datum> = val.iter()
+                    .map(|a| a.to().take_datum())
+                    .collect();
+                let arr = RepeatedField::from_vec(args);
+                datum.set_r_array(arr);
             },
-            Value::Object(_val) => {
-                unimplemented!();
+            Value::Object(val) => {
+                datum.set_field_type(DT::R_OBJECT);
+                let args: Vec<DA> = val.into_iter()
+                    .map(|(name, arg)| {
+                        let mut obj = DA::new();
+                        obj.set_key(name.into());
+                        obj.set_val(arg.to().take_datum());
+                        obj
+                    })
+                    .collect();
+                let obj = RepeatedField::from_vec(args);
+                datum.set_r_object(obj);
             },
             Value::Null => {
                 datum.set_field_type(DT::R_NULL);
@@ -244,109 +268,109 @@ impl FromTerm for Term {
 }
 
 pub trait Command : FromTerm + ToTerm {
-    fn expr<T>(self, arg: T) -> Self
+    fn expr<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         FromTerm::from(arg.to())
     }
 
-    fn db<T>(self, arg: T) -> Self
+    fn db<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         command!(TT::DB, self, Some(vec![arg.to()]))
     }
 
-    fn db_create<T>(self, arg: T) -> Self
+    fn db_create<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         command!(TT::DB_CREATE, self, Some(vec![arg.to()]))
     }
 
-    fn db_drop<T>(self, arg: T) -> Self
+    fn db_drop<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         command!(TT::DB_DROP, self, Some(vec![arg.to()]))
     }
 
-    fn table<T>(self, arg: T) -> Self
+    fn table<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         command!(TT::TABLE, self, Some(vec![arg.to()]))
     }
 
-    fn table_create<T>(self, arg: T) -> Self
+    fn table_create<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         command!(TT::TABLE_CREATE, self, Some(vec![arg.to()]))
     }
 
-    fn table_drop<T>(self, arg: T) -> Self
+    fn table_drop<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         command!(TT::TABLE_DROP, self, Some(vec![arg.to()]))
     }
 
-    fn index_create<T>(self, arg: T) -> Self
+    fn index_create<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         command!(TT::INDEX_CREATE, self, Some(vec![arg.to()]))
     }
 
-    fn index_drop<T>(self, arg: T) -> Self
+    fn index_drop<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         command!(TT::INDEX_DROP, self, Some(vec![arg.to()]))
     }
 
-    fn replace<T>(self, arg: T) -> Self
+    fn replace<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         command!(TT::REPLACE, self, Some(vec![arg.to()]))
     }
 
-    fn update<T>(self, arg: T) -> Self
+    fn update<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         command!(TT::UPDATE, self, Some(vec![arg.to()]))
     }
 
-    fn order_by<T>(self, arg: T) -> Self
+    fn order_by<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         command!(TT::ORDER_BY, self, Some(vec![arg.to()]))
     }
 
-    fn without<T>(self, arg: T) -> Self
+    fn without<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         command!(TT::WITHOUT, self, Some(vec![arg.to()]))
     }
 
-    fn contains<T>(self, arg: T) -> Self
+    fn contains<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         command!(TT::CONTAINS, self, Some(vec![arg.to()]))
     }
 
-    fn limit<T>(self, arg: T) -> Self
+    fn limit<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         command!(TT::LIMIT, self, Some(vec![arg.to()]))
     }
 
-    fn get<T>(self, arg: T) -> Self
+    fn get<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         command!(TT::GET, self, Some(vec![arg.to()]))
     }
 
-    fn get_all<T>(self, arg: T) -> Self
+    fn get_all<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         command!(TT::GET_ALL, self, Some(vec![arg.to()]))
     }
 
-    fn opt_arg<T>(self, name: &str, arg: T) -> Self
+    fn opt_arg<T>(&self, name: &str, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         let mut opt = TA::new();
@@ -358,49 +382,49 @@ pub trait Command : FromTerm + ToTerm {
         FromTerm::from(term)
     }
 
-    fn insert<T>(self, arg: T) -> Self
+    fn insert<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         command!(TT::INSERT, self, Some(vec![arg.to()]))
     }
 
-    fn delete(self) -> Self
+    fn delete(&self) -> Self
         where Self: Sized
     {
         command!(TT::DELETE, self, None as Option<Vec<Term>>)
     }
 
-    fn changes(self) -> Self
+    fn changes(&self) -> Self
         where Self: Sized
     {
         command!(TT::CHANGES, self, None as Option<Vec<Term>>)
     }
 
-    fn has_fields<T>(self, arg: T) -> Self
+    fn has_fields<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         command!(TT::HAS_FIELDS, self, Some(vec![arg.to()]))
     }
 
-    fn get_field<T>(self, arg: T) -> Self
+    fn get_field<T>(&self, arg: T) -> Self
         where T: ToTerm, Self: Sized
     {
         command!(TT::GET_FIELD, self, Some(vec![arg.to()]))
     }
 
-    fn filter<F>(self, func: F) -> Self
+    fn filter<F>(&self, func: F) -> Self
         where F: FnOnce(Term) -> Term, Self: Sized
     {
         command!(TT::FILTER, self, Some(closure_arg!(func)))
     }
 
-    fn map<F>(self, func: F) -> Self
+    fn map<F>(&self, func: F) -> Self
         where F: FnOnce(Term) -> Term, Self: Sized
     {
         command!(TT::MAP, self, Some(closure_arg!(func)))
     }
 
-    fn branch<T, O>(self, arg: T) -> Self
+    fn branch<T, O>(&self, arg: T) -> Self
         where O: ToTerm + Sized, T: IntoIterator<Item=O>, Self: Sized
     {
         let args: Vec<Term> = arg.into_iter()
@@ -409,22 +433,25 @@ pub trait Command : FromTerm + ToTerm {
         command!(TT::BRANCH, self, Some(args))
     }
 
-    fn object<T, O>(self, arg: T) -> Self
-        where O: ToTerm + Sized, T: IntoIterator<Item=O>, Self: Sized
+    fn object<'a, T, O>(&self, arg: T) -> Self
+        where O: ToJson + Sized, T: IntoIterator<Item=(&'a str, O)>, Self: Sized
     {
-        let args: Vec<Term> = arg.into_iter()
-            .map(|a| a.to())
-            .collect();
-        command!(TT::MAKE_OBJ, self, Some(args))
+        let mut obj = BTreeMap::new();
+        for (key, val) in arg {
+            obj.insert(key.to_string(), val.to_json());
+        }
+        let obj = Value::Object(obj);
+        FromTerm::from(obj.to())
     }
 
-    fn array<T, O>(self, arg: T) -> Self
-        where O: ToTerm + Sized, T: IntoIterator<Item=O>, Self: Sized
+    fn array<T, O>(&self, arg: T) -> Self
+        where O: ToJson + Sized, T: IntoIterator<Item=O>, Self: Sized
     {
-        let args: Vec<Term> = arg.into_iter()
-            .map(|a| a.to())
+        let args: Vec<Value> = arg.into_iter()
+            .map(|a| a.to_json())
             .collect();
-        command!(TT::MAKE_ARRAY, self, Some(args))
+        let arr = Value::Array(args);
+        FromTerm::from(arr.to())
     }
 }
 
