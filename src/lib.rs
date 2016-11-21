@@ -53,7 +53,7 @@ macro_rules! closure_par {
         var.set_field_type(TT::VAR);
         let args = RepeatedField::from_vec(vec![datum]);
         var.set_args(args);
-        var
+        FromTerm::from_term(var)
     }}
 }
 
@@ -76,7 +76,7 @@ macro_rules! closure_arg {
         let mut func = Term::new();
         func.set_field_type(TT::FUNC);
         let res = $func(closure_par!());
-        let args = RepeatedField::from_vec(vec![datum, res]);
+        let args = RepeatedField::from_vec(vec![datum, res.to_term()]);
         func.set_args(args);
         vec![func]
     }}
@@ -188,7 +188,7 @@ impl Encode for Vec<TA> {
     fn encode(&self) -> String {
         let mut opts = String::from("{");
         for term in self {
-            opts.push_str(&format!("{:?}:{},", term.get_key(), term.get_val().encode()));
+            opts.push_str(&format!("\"{}\":{},", term.get_key(), term.get_val().encode()));
         }
         opts = opts.trim_right_matches(",").to_string();
         opts.push_str("}");
@@ -204,7 +204,7 @@ impl Encode for Datum {
             },
             DT::R_BOOL => {
                 if self.has_r_bool() {
-                    format!("{:?}", self.get_r_bool())
+                    format!("\"{}\"", self.get_r_bool())
                 } else {
                     unimplemented!();
                 }
@@ -218,7 +218,7 @@ impl Encode for Datum {
             },
             DT::R_STR => {
                 if self.has_r_str() {
-                    format!("{:?}", self.get_r_str())
+                    format!("\"{}\"", self.get_r_str())
                 } else {
                     unimplemented!();
                 }
@@ -235,7 +235,7 @@ impl Encode for Datum {
             DT::R_OBJECT => {
                 let mut args = String::from("{");
                 for term in self.get_r_object() {
-                    args.push_str(&format!("{:?}:{},", term.get_key(), term.get_val().encode()));
+                    args.push_str(&format!("\"{}\":{},", term.get_key(), term.get_val().encode()));
                 }
                 args = args.trim_right_matches(",").to_string();
                 args.push_str("}");
@@ -550,13 +550,13 @@ pub trait Command : FromTerm + ToTerm {
     }
 
     fn filter<F>(&self, func: F) -> Self
-        where F: FnOnce(Term) -> Term, Self: Sized
+        where F: FnOnce(Self) -> Self, Self: Sized
     {
         command!(TT::FILTER, self, Some(closure_arg!(func)))
     }
 
     fn map<F>(&self, func: F) -> Self
-        where F: FnOnce(Term) -> Term, Self: Sized
+        where F: FnOnce(Self) -> Self, Self: Sized
     {
         command!(TT::MAP, self, Some(closure_arg!(func)))
     }
@@ -595,5 +595,5 @@ fn test_commands_can_be_chained() {
     impl Command for Term { }
     let r = Term::new();
     let term = r.db("heroes").table("marvel").map(|row| row.get_field("first_appearance"));
-    panic!(format!("{:?}\n\n{}\n\n{:?}", term, term.encode(), term.info()));
+    panic!(format!("\"{}\"\n\n{}\n\n\"{}\"", term, term.encode(), term.info()));
 }
