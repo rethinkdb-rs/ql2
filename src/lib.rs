@@ -594,6 +594,5 @@ pub trait Command : FromTerm + ToTerm {
 fn test_commands_can_be_chained() {
     impl Command for Term { }
     let r = Term::new();
-    let term = r.db("heroes").table("marvel").map(|row| row.get_field("first_appearance"));
-    panic!(format!("\"{}\"\n\n{}\n\n\"{}\"", term, term.encode(), term.info()));
+    r.db("heroes").table("marvel").map(|row| row.get_field("first_appearance"));
 }
