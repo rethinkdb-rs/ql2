@@ -1,12 +1,12 @@
 [package]
 name = "ql2"
-description = "RethinkDB protocol"
-version = "1.0.1"
+description = "RethinkDB protocol; data structures and traits"
+version = "1.1.0-alpha.1"
 license = "MIT/Apache-2.0"
 repository = "https://github.com/rust-rethinkdb/ql2"
-documentation = "http://rust-rethinkdb.github.io/ql2/1.0.x/ql2"
+documentation = "https://docs.rs/ql2"
 readme = "README.md"
-keywords = ["database", "rethinkdb", "reql"]
+keywords = ["database", "rethinkdb", "reql", "ql2"]
 authors = ["rushmorem <rushmore@webenchanter.com>"]
 
 [dependencies]
