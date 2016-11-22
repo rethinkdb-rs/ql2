@@ -1,582 +1,160 @@
 //! RethinkDB protocol implementation in Rust
 
 extern crate protobuf;
-extern crate serde_json;
 
-pub mod proto;
+mod proto;
 
-use std::collections::BTreeMap;
+/// *Arrays* are lists of zero or more elements.
+///
+/// ```json
+/// [1, 2, 3]
+/// []
+/// [{user: 'Bob', posts: 23}, {user: 'Jason', posts: 10}]
+/// ```
+/// Anything valid in a JSON array is valid in RethinkDB.
+/// The elements may be any of the basic values, objects,
+/// or other arrays. Arrays in RethinkDB are loaded fully
+/// into memory before they’re returned to the user, so
+/// they’re inefficient at large sizes. RethinkDB defaults
+/// to supporting arrays of up to 100,000 elements; this
+/// may be set to a different value at runtime for reading
+/// by using the `array_limit` option to run.
+pub struct Array(proto::Term);
 
-use serde_json::value::{Value, Map, ToJson};
-use protobuf::repeated::RepeatedField;
-use protobuf::ProtobufEnum;
-pub use proto::{
-    Term, Datum,
-    Term_TermType as TT,
-    Term_AssocPair as TA,
-    Datum_DatumType as DT,
-    Datum_AssocPair as DA
-};
+/// *Booleans* are `true` and `false`
+pub struct Bool(proto::Term);
 
-macro_rules! command {
-    ($T:expr, $cmd:expr, $args:expr) => {{
-        let mut term = Term::new();
-        term.set_field_type($T);
-        let mut args = Vec::new();
-        let cmd = $cmd.to_term();
-        if !cmd.is_empty() {
-            args.push(cmd);
-        }
-        if let Some(list) = $args {
-            args.extend(list);
-        }
-        if !args.is_empty() {
-            let args = RepeatedField::from_vec(args);
-            term.set_args(args);
-        }
-        FromTerm::from_term(term)
-    }}
-}
+/// *Databases* are RethinkDB databases.
+///
+/// This is the return type of `db`.
+pub struct Db(proto::Term);
 
-macro_rules! closure_par {
-    () => {{
-        // ID
-        let mut id = Datum::new();
-        id.set_field_type(DT::R_NUM);
-        id.set_r_num(1.0);
-        // DATUM
-        let mut datum = Term::new();
-        datum.set_field_type(TT::DATUM);
-        datum.set_datum(id);
-        // VAR
-        let mut var = Term::new();
-        var.set_field_type(TT::VAR);
-        let args = RepeatedField::from_vec(vec![datum]);
-        var.set_args(args);
-        FromTerm::from_term(var)
-    }}
-}
+/// *Functions* can be passed as parameters to certain ReQL
+/// commands.
+pub struct Function(proto::Term);
 
-macro_rules! closure_arg {
-    ($func:expr) => {{
-        // ID
-        let mut id = Datum::new();
-        id.set_field_type(DT::R_NUM);
-        id.set_r_num(1.0);
-        // ARRAY
-        let mut array = Datum::new();
-        array.set_field_type(DT::R_ARRAY);
-        let args = RepeatedField::from_vec(vec![id]);
-        array.set_r_array(args);
-        // DATUM
-        let mut datum = Term::new();
-        datum.set_field_type(TT::DATUM);
-        datum.set_datum(array);
-        // FUNC
-        let mut func = Term::new();
-        func.set_field_type(TT::FUNC);
-        let res = $func(closure_par!());
-        let args = RepeatedField::from_vec(vec![datum, res.to_term()]);
-        func.set_args(args);
-        vec![func]
-    }}
-}
+/// *Grouped data* is created by the `group` command.
+///
+/// The command partitions a stream into multiple groups
+/// based on specified fields or functions. ReQL commands
+/// called on GroupedData operate on each group
+/// individually. For more details, read the group
+/// documentation. Depending on the input to group,
+/// grouped data may have the type of GroupedStream.
+pub struct GroupedData(proto::Term);
+pub struct GroupedStream(proto::Term);
 
-pub type Array = Vec<Term>;
+/// *Minval* and *maxval* are used with some commands such
+/// as `between` to specify absolute lower and upper bounds
+/// (e.g., `between(r.minval, 1000)` would return all
+/// documents in a table whose primary key is less than
+/// 1000).
+pub struct MaxVal(proto::Term);
+pub struct MinVal(proto::Term);
 
-pub type Object = Map<String, Term>;
+/// *Null* is a value distinct from the number zero, an
+/// empty set, or a zero-length string.
+///
+/// Natively this is
+/// `None`. It is often used to explicitly denote the
+/// absence of any other value. The root node of a tree
+/// structure might have a parent of `null`, or a required
+/// but as yet non-initialized key might be given a value
+/// of `null`.
+pub struct Null(proto::Term);
 
-pub trait IsDatum {
-    fn is_datum(&self) -> bool;
-}
+/// *Numbers* are any real number: `5`, `3.14159`, `-42`.
+///
+/// RethinkDB uses double precision (64-bit) floating point
+/// numbers internally. Neither infinity nor NaN are allowed.
+pub struct Number(proto::Term);
 
-pub trait IsEmpty {
-    fn is_empty(&self) -> bool;
-}
+/// *Objects* are JSON data objects, standard key-value pairs.
+///
+/// ```json
+/// {
+///     username: 'bob',
+///     posts: 23,
+///     favorites: {
+///         color: 'blue',
+///         food: 'tacos'
+///     },
+///     friends: ['agatha', 'jason']
+/// }
+/// ```
+///
+/// Any valid JSON object is a valid RethinkDB object, so
+/// values can be any of the basic values, arrays, or
+/// other objects. Documents in a RethinkDB database are
+/// objects. Like JSON, key names must be strings, not
+/// integers.
+pub struct Object(proto::Term);
 
-pub trait Encode {
-    fn encode(&self) -> String;
-}
+/// *Binary* objects are similar to BLOBs in SQL databases:
+/// files, images and other binary data.
+///
+/// See Storing binary objects for details.
+pub struct Binary(proto::Term);
 
-pub trait Decode {
-    fn decode(&self) -> Value;
-}
+/// *Geometry* data types for geospatial support, including
+/// points, lines, and polygons.
+pub struct Geometry(proto::Term);
 
-pub trait ToTerm {
-    fn to_term(&self) -> Term;
-}
+/// *Times* are RethinkDB’s native date/time type, stored
+/// with millisecond precision.
+///
+/// You can use native date/time types in supported
+/// languages, as the conversion will be done by the driver.
+/// See Dates and times in RethinkDB for details.
+pub struct Time(proto::Term);
 
-pub trait FromTerm {
-    fn from_term(t: Term) -> Self;
-}
+/// *Selections* represent subsets of tables, for example,
+/// the return values of `filter` or `get`.
+///
+/// There are three kinds of selections: *Selection<Object>*,
+/// *Selection<Array>* and *Selection<Stream>*. The
+/// difference between selections and their non-selection
+/// counterparts is that selections are writable—their
+/// return values can be passed as inputs to ReQL commands
+/// that modify the database. For instance, the get command
+/// will return a Selection<Object> that could then be
+/// passed to an update or delete command.
+///
+/// (Note: *singleSelection* is an older term for
+/// Selection<Object>; they mean the same thing.)
+/// Some commands (`order_by` and `between`) return a data
+/// type similar to a selection called a *table_slice*.
+/// In most cases a table_slice behaves identically to a
+/// selection, but `between` can only be called on a table
+/// or a table_slice, not any other kind of selection.
+pub struct Selection<T>(T);
 
-#[derive(Debug, Clone)]
-pub struct QueryInfo {
-    db_set: bool,
-    query: String,
-    op: String,
-}
+/// *Streams* are lists like arrays, but they’re loaded in
+/// a lazy fashion.
+///
+/// Operations that return streams return a `cursor`.
+/// A cursor is a pointer into the result set. Instead of
+/// reading the results all at once like an array, you
+/// loop over the results, retrieving the next member of the
+/// set with each iteration. This makes it possible to
+/// efficiently work with large result sets.
+/// 
+/// (See “Working with Streams,” below, for some tips.)
+/// Streams are read-only; you can’t pass one as an input
+/// to an ReQL command meant to modify its input like
+/// `update` or `delete`.
+pub struct Stream(proto::Term);
 
-impl QueryInfo {
-    pub fn db_set(&self) -> bool {
-        self.db_set
-    }
+/// *Strings* are any valid UTF-8 string: `"superhero"`,
+/// `"ünnëcëssärÿ ümläüts"`. Strings may include the null
+/// code point (U+0000).
+pub struct String(proto::Term);
 
-    /*
-    fn query(&self) -> String {
-        self.query.to_string()
-    }
-
-    fn cmd_type(&self) -> String {
-        self.op.to_string()
-    }
-    */
-}
-
-pub trait Info {
-    fn info(&self) -> QueryInfo;
-}
-
-impl Info for Term {
-    fn info(&self) -> QueryInfo {
-        let mut inf = QueryInfo {
-            db_set: false,
-            query: String::new(),
-            op: String::from("read"),
-        };
-        let cmd = self.get_field_type()
-            .descriptor()
-            .name();
-        if cmd == "INSERT" {
-            inf.op = String::from("INSERT");
-        } else if cmd == "CHANGES" {
-            inf.op = String::from("CHANGES");
-        } else if cmd == "DB" {
-            inf.db_set = true;
-        }
-        inf.query.push_str(&format!(".{}(arg)", cmd));
-        let terms = self.get_args();
-        if !terms.is_empty() {
-            for term in terms {
-                let tinf = term.info();
-                if tinf.db_set {
-                    inf.db_set = true;
-                }
-                inf.query.push_str(&tinf.query);
-                if tinf.op != "read" {
-                    inf.op = tinf.op;
-                }
-            }
-        }
-        inf
-    }
-}
-
-impl IsDatum for Term {
-    fn is_datum(&self) -> bool {
-        self.get_field_type() == TT::DATUM
-    }
-}
-
-impl IsEmpty for Term {
-    fn is_empty(&self) -> bool {
-        *self == Term::new()
-    }
-}
-
-impl Encode for Vec<TA> {
-    fn encode(&self) -> String {
-        let mut opts = String::from("{");
-        for term in self {
-            opts.push_str(&format!("\"{}\":{},", term.get_key(), term.get_val().encode()));
-        }
-        opts = opts.trim_right_matches(",").to_string();
-        opts.push_str("}");
-        opts
-    }
-}
-
-impl Encode for Datum {
-    fn encode(&self) -> String {
-        match self.get_field_type() {
-            DT::R_NULL => {
-                unimplemented!();
-            },
-            DT::R_BOOL => {
-                if self.has_r_bool() {
-                    format!("\"{}\"", self.get_r_bool())
-                } else {
-                    unimplemented!();
-                }
-            },
-            DT::R_NUM => {
-                if self.has_r_num() {
-                    format!("{}", self.get_r_num())
-                } else {
-                    unimplemented!();
-                }
-            },
-            DT::R_STR => {
-                if self.has_r_str() {
-                    format!("\"{}\"", self.get_r_str())
-                } else {
-                    unimplemented!();
-                }
-            },
-            DT::R_ARRAY => {
-                let mut args = format!("[{},[", TT::MAKE_ARRAY.value());
-                for term in self.get_r_array() {
-                    args.push_str(&format!("{},", term.encode()));
-                }
-                args = args.trim_right_matches(",").to_string();
-                args.push_str("]]");
-                args
-            },
-            DT::R_OBJECT => {
-                let mut args = String::from("{");
-                for term in self.get_r_object() {
-                    args.push_str(&format!("\"{}\":{},", term.get_key(), term.get_val().encode()));
-                }
-                args = args.trim_right_matches(",").to_string();
-                args.push_str("}");
-                args
-            },
-            DT::R_JSON => {
-                unimplemented!();
-            },
-        }
-    }
-}
-
-impl Encode for Term {
-    fn encode(&self) -> String {
-        let mut res = Vec::new();
-        if !self.is_datum() {
-            res.push(format!("[{}", self.get_field_type().value()));
-        }
-        if self.has_datum() {
-            let datum = self.get_datum();
-            res.push(datum.encode());
-        }
-        let terms = self.get_args();
-        if !terms.is_empty() {
-            let mut args = String::from("[");
-            for term in terms {
-                args.push_str(&format!("{},", term.encode()));
-            }
-            args = args.trim_right_matches(",").to_string();
-            args.push_str("]");
-            res.push(args);
-        }
-        let opts = self.clone().take_optargs().into_vec();
-        if !opts.is_empty() {
-            res.push(format!("{}", opts.encode()));
-        }
-        let mut res = res.join(",");
-        if !self.is_datum() {
-            res.push_str("]");
-        }
-        res
-    }
-}
-
-impl<T: ToJson> ToTerm for T {
-    fn to_term(&self) -> Term {
-        // Datum
-        let mut datum = Datum::new();
-        match self.to_json() {
-            Value::String(val) => {
-                datum.set_field_type(DT::R_STR);
-                datum.set_r_str(val);
-            },
-            Value::Bool(val) => {
-                datum.set_field_type(DT::R_BOOL);
-                datum.set_r_bool(val);
-            },
-            Value::I64(val) => {
-                datum.set_field_type(DT::R_NUM);
-                datum.set_r_num(val as f64);
-            },
-            Value::U64(val) => {
-                datum.set_field_type(DT::R_NUM);
-                datum.set_r_num(val as f64);
-            },
-            Value::F64(val) => {
-                datum.set_field_type(DT::R_NUM);
-                datum.set_r_num(val);
-            },
-            Value::Array(val) => {
-                datum.set_field_type(DT::R_ARRAY);
-                let args: Vec<Datum> = val.iter()
-                    .map(|a| a.to_term().take_datum())
-                    .collect();
-                let arr = RepeatedField::from_vec(args);
-                datum.set_r_array(arr);
-            },
-            Value::Object(val) => {
-                datum.set_field_type(DT::R_OBJECT);
-                let args: Vec<DA> = val.into_iter()
-                    .map(|(name, arg)| {
-                        let mut obj = DA::new();
-                        obj.set_key(name.into());
-                        obj.set_val(arg.to_term().take_datum());
-                        obj
-                    })
-                    .collect();
-                let obj = RepeatedField::from_vec(args);
-                datum.set_r_object(obj);
-            },
-            Value::Null => {
-                datum.set_field_type(DT::R_NULL);
-            },
-        }
-        // Term
-        let mut term = Term::new();
-        term.set_field_type(TT::DATUM);
-        term.set_datum(datum);
-        term
-    }
-}
-
-impl ToTerm for Term {
-    fn to_term(&self) -> Term {
-        self.clone()
-    }
-}
-
-pub fn find_datum(mut t: Term) -> Option<Datum> {
-    if t.has_datum() {
-        return Some(t.take_datum());
-    }
-    for arg in t.take_args().into_vec() {
-        let datum = find_datum(arg);
-        if datum.is_some() {
-            return datum;
-        }
-    }
-    None
-}
-
-impl From<BTreeMap<String, Term>> for Term {
-    fn from(t: BTreeMap<String, Term>) -> Term {
-        let mut term = Term::new();
-        let mut args = Vec::new();
-        for (name, arg) in t.into_iter() {
-            let mut obj = TA::new();
-            obj.set_key(name.into());
-            obj.set_val(arg);
-            args.push(obj);
-        }
-        let obj = RepeatedField::from_vec(args);
-        term.set_optargs(obj);
-        term
-    }
-}
-
-impl From<Vec<Term>> for Term {
-    fn from(t: Vec<Term>) -> Term {
-        let mut term = Term::new();
-        let arr = RepeatedField::from_vec(t);
-        term.set_args(arr);
-        term
-    }
-}
-
-impl FromTerm for Term {
-    fn from_term(t: Term) -> Term {
-        t
-    }
-}
-
-pub trait Command : FromTerm + ToTerm {
-    fn expr<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        FromTerm::from_term(arg.to_term())
-    }
-
-    fn db<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        command!(TT::DB, self, Some(vec![arg.to_term()]))
-    }
-
-    fn db_create<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        command!(TT::DB_CREATE, self, Some(vec![arg.to_term()]))
-    }
-
-    fn db_drop<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        command!(TT::DB_DROP, self, Some(vec![arg.to_term()]))
-    }
-
-    fn table<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        command!(TT::TABLE, self, Some(vec![arg.to_term()]))
-    }
-
-    fn table_create<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        command!(TT::TABLE_CREATE, self, Some(vec![arg.to_term()]))
-    }
-
-    fn table_drop<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        command!(TT::TABLE_DROP, self, Some(vec![arg.to_term()]))
-    }
-
-    fn index_create<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        command!(TT::INDEX_CREATE, self, Some(vec![arg.to_term()]))
-    }
-
-    fn index_drop<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        command!(TT::INDEX_DROP, self, Some(vec![arg.to_term()]))
-    }
-
-    fn replace<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        command!(TT::REPLACE, self, Some(vec![arg.to_term()]))
-    }
-
-    fn update<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        command!(TT::UPDATE, self, Some(vec![arg.to_term()]))
-    }
-
-    fn order_by<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        command!(TT::ORDER_BY, self, Some(vec![arg.to_term()]))
-    }
-
-    fn without<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        command!(TT::WITHOUT, self, Some(vec![arg.to_term()]))
-    }
-
-    fn contains<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        command!(TT::CONTAINS, self, Some(vec![arg.to_term()]))
-    }
-
-    fn limit<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        command!(TT::LIMIT, self, Some(vec![arg.to_term()]))
-    }
-
-    fn get<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        command!(TT::GET, self, Some(vec![arg.to_term()]))
-    }
-
-    fn get_all<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        command!(TT::GET_ALL, self, Some(vec![arg.to_term()]))
-    }
-
-    fn opt_arg<T>(&self, name: &str, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        let mut opt = TA::new();
-        opt.set_key(name.into());
-        opt.set_val(arg.to_term());
-        let arg = RepeatedField::from_vec(vec![opt]);
-        let mut term = self.to_term();
-        term.set_optargs(arg);
-        FromTerm::from_term(term)
-    }
-
-    fn insert<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        command!(TT::INSERT, self, Some(vec![arg.to_term()]))
-    }
-
-    fn delete(&self) -> Self
-        where Self: Sized
-    {
-        command!(TT::DELETE, self, None as Option<Vec<Term>>)
-    }
-
-    fn changes(&self) -> Self
-        where Self: Sized
-    {
-        command!(TT::CHANGES, self, None as Option<Vec<Term>>)
-    }
-
-    fn has_fields<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        command!(TT::HAS_FIELDS, self, Some(vec![arg.to_term()]))
-    }
-
-    fn get_field<T>(&self, arg: T) -> Self
-        where T: ToTerm, Self: Sized
-    {
-        command!(TT::GET_FIELD, self, Some(vec![arg.to_term()]))
-    }
-
-    fn filter<F>(&self, func: F) -> Self
-        where F: FnOnce(Self) -> Self, Self: Sized
-    {
-        command!(TT::FILTER, self, Some(closure_arg!(func)))
-    }
-
-    fn map<F>(&self, func: F) -> Self
-        where F: FnOnce(Self) -> Self, Self: Sized
-    {
-        command!(TT::MAP, self, Some(closure_arg!(func)))
-    }
-
-    fn branch<T, O>(&self, arg: T) -> Self
-        where O: ToTerm + Sized, T: IntoIterator<Item=O>, Self: Sized
-    {
-        let args: Vec<Term> = arg.into_iter()
-            .map(|a| a.to_term())
-            .collect();
-        command!(TT::BRANCH, self, Some(args))
-    }
-
-    fn object<'a, T, O>(&self, arg: T) -> Self
-        where O: ToTerm + Sized, T: IntoIterator<Item=(&'a str, O)>, Self: Sized
-    {
-        let mut obj = BTreeMap::new();
-        for (key, val) in arg {
-            obj.insert(key.to_string(), val.to_term());
-        }
-        FromTerm::from_term(Term::from(obj))
-    }
-
-    fn array<T, O>(&self, arg: T) -> Self
-        where O: ToTerm + Sized, T: IntoIterator<Item=O>, Self: Sized
-    {
-        let arr: Vec<Term> = arg.into_iter()
-            .map(|a| a.to_term())
-            .collect();
-        FromTerm::from_term(Term::from(arr))
-    }
-}
-
-#[test]
-fn test_commands_can_be_chained() {
-    impl Command for Term { }
-    let r = Term::new();
-    r.db("heroes").table("marvel").map(|row| row.get_field("first_appearance"));
-}
+/// *Tables* are RethinkDB database tables.
+///
+/// They behave like selections—they’re writable, as you can
+/// insert and delete documents in them. ReQL methods that
+/// use an index, like `get_all`, are only available on
+/// tables.
+pub struct Table(proto::Term);
+pub struct TableSlice(proto::Term);
