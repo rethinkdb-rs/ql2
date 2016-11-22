@@ -250,13 +250,13 @@ impl Encode for Datum {
 
 impl Encode for Term {
     fn encode(&self) -> String {
-        let mut res = String::new();
+        let mut res = Vec::new();
         if !self.is_datum() {
-            res.push_str(&format!("[{},", self.get_field_type().value()));
+            res.push(format!("[{}", self.get_field_type().value()));
         }
         if self.has_datum() {
             let datum = self.get_datum();
-            res.push_str(&datum.encode());
+            res.push(datum.encode());
         }
         let terms = self.get_args();
         if !terms.is_empty() {
@@ -266,12 +266,13 @@ impl Encode for Term {
             }
             args = args.trim_right_matches(",").to_string();
             args.push_str("]");
-            res.push_str(&args);
+            res.push(args);
         }
         let opts = self.clone().take_optargs().into_vec();
         if !opts.is_empty() {
-            res.push_str(&format!(",{}", opts.encode()));
+            res.push(format!("{}", opts.encode()));
         }
+        let mut res = res.join(",");
         if !self.is_datum() {
             res.push_str("]");
         }
@@ -358,42 +359,25 @@ pub fn find_datum(mut t: Term) -> Option<Datum> {
 
 impl From<BTreeMap<String, Term>> for Term {
     fn from(t: BTreeMap<String, Term>) -> Term {
-        // Datum
-        let mut datum = Datum::new();
-        datum.set_field_type(DT::R_OBJECT);
+        let mut term = Term::new();
         let mut args = Vec::new();
         for (name, arg) in t.into_iter() {
-            if let Some(val) = find_datum(arg) {
-                let mut obj = DA::new();
-                obj.set_key(name.into());
-                obj.set_val(val);
-                args.push(obj);
-            }
+            let mut obj = TA::new();
+            obj.set_key(name.into());
+            obj.set_val(arg);
+            args.push(obj);
         }
         let obj = RepeatedField::from_vec(args);
-        datum.set_r_object(obj);
-        // Term
-        let mut term = Term::new();
-        term.set_field_type(TT::DATUM);
-        term.set_datum(datum);
+        term.set_optargs(obj);
         term
     }
 }
 
 impl From<Vec<Term>> for Term {
     fn from(t: Vec<Term>) -> Term {
-        // Datum
-        let mut datum = Datum::new();
-        datum.set_field_type(DT::R_ARRAY);
-        let args: Vec<Datum> = t.into_iter()
-            .map(|mut a| a.take_datum())
-            .collect();
-        let arr = RepeatedField::from_vec(args);
-        datum.set_r_array(arr);
-        // Term
         let mut term = Term::new();
-        term.set_field_type(TT::DATUM);
-        term.set_datum(datum);
+        let arr = RepeatedField::from_vec(t);
+        term.set_args(arr);
         term
     }
 }
