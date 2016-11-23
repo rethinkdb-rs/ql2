@@ -4,6 +4,72 @@ extern crate protobuf;
 
 mod proto;
 
+pub use proto::{
+    VersionDummy_Version as Version,
+    Term_TermType as TermType,
+    Query_QueryType as QueryType,
+    Response_ResponseType as ResponseType,
+    Response_ErrorType as ErrorType,
+};
+
+use std::string::String as StdString;
+
+use proto::{
+    Term, Datum,
+    Datum_DatumType as DatumType,
+};
+
+use protobuf::repeated::RepeatedField;
+
+macro_rules! implement {
+    (Selection<$dt:ident>) => {
+        impl DataType for Selection<$dt> {}
+
+        impl Selection<$dt> {
+            pub fn new() -> Selection<$dt> {
+                Selection::<$dt>($dt(Term::new()))
+            }
+        }
+
+        impl From<Selection<$dt>> for Term {
+            fn from(t: Selection<$dt>) -> Term {
+                From::from(t.0)
+            }
+        }
+
+        impl From<Term> for Selection<$dt> {
+            fn from(t: Term) -> Selection<$dt> {
+                Selection::<$dt>($dt(t))
+            }
+        }
+    };
+
+    ($dt:ident) => {
+        #[derive(Debug, Clone)]
+        pub struct $dt(Term);
+
+        impl DataType for $dt {}
+
+        impl $dt {
+            pub fn new() -> $dt {
+                $dt(Term::new())
+            }
+        }
+
+        impl From<$dt> for Term {
+            fn from(t: $dt) -> Term {
+                t.0
+            }
+        }
+
+        impl From<Term> for $dt {
+            fn from(t: Term) -> $dt {
+                $dt(t)
+            }
+        }
+    };
+}
+
 /// *Arrays* are lists of zero or more elements.
 ///
 /// ```json
@@ -19,19 +85,19 @@ mod proto;
 /// to supporting arrays of up to 100,000 elements; this
 /// may be set to a different value at runtime for reading
 /// by using the `array_limit` option to run.
-pub struct Array(proto::Term);
+implement! { Array }
 
 /// *Booleans* are `true` and `false`
-pub struct Bool(proto::Term);
+implement! { Bool }
 
 /// *Databases* are RethinkDB databases.
 ///
 /// This is the return type of `db`.
-pub struct Db(proto::Term);
+implement! { Db }
 
 /// *Functions* can be passed as parameters to certain ReQL
 /// commands.
-pub struct Function(proto::Term);
+implement! { Function }
 
 /// *Grouped data* is created by the `group` command.
 ///
@@ -41,16 +107,16 @@ pub struct Function(proto::Term);
 /// individually. For more details, read the group
 /// documentation. Depending on the input to group,
 /// grouped data may have the type of GroupedStream.
-pub struct GroupedData(proto::Term);
-pub struct GroupedStream(proto::Term);
+implement! { GroupedData }
+implement! { GroupedStream }
 
 /// *Minval* and *maxval* are used with some commands such
 /// as `between` to specify absolute lower and upper bounds
 /// (e.g., `between(r.minval, 1000)` would return all
 /// documents in a table whose primary key is less than
 /// 1000).
-pub struct MaxVal(proto::Term);
-pub struct MinVal(proto::Term);
+implement! { MaxVal }
+implement! { MinVal }
 
 /// *Null* is a value distinct from the number zero, an
 /// empty set, or a zero-length string.
@@ -61,13 +127,13 @@ pub struct MinVal(proto::Term);
 /// structure might have a parent of `null`, or a required
 /// but as yet non-initialized key might be given a value
 /// of `null`.
-pub struct Null(proto::Term);
+implement! { Null }
 
 /// *Numbers* are any real number: `5`, `3.14159`, `-42`.
 ///
 /// RethinkDB uses double precision (64-bit) floating point
 /// numbers internally. Neither infinity nor NaN are allowed.
-pub struct Number(proto::Term);
+implement! { Number }
 
 /// *Objects* are JSON data objects, standard key-value pairs.
 ///
@@ -88,17 +154,17 @@ pub struct Number(proto::Term);
 /// other objects. Documents in a RethinkDB database are
 /// objects. Like JSON, key names must be strings, not
 /// integers.
-pub struct Object(proto::Term);
+implement! { Object }
 
 /// *Binary* objects are similar to BLOBs in SQL databases:
 /// files, images and other binary data.
 ///
 /// See Storing binary objects for details.
-pub struct Binary(proto::Term);
+implement! { Binary }
 
 /// *Geometry* data types for geospatial support, including
 /// points, lines, and polygons.
-pub struct Geometry(proto::Term);
+implement! { Geometry }
 
 /// *Times* are RethinkDB’s native date/time type, stored
 /// with millisecond precision.
@@ -106,7 +172,37 @@ pub struct Geometry(proto::Term);
 /// You can use native date/time types in supported
 /// languages, as the conversion will be done by the driver.
 /// See Dates and times in RethinkDB for details.
-pub struct Time(proto::Term);
+implement! { Time }
+
+/// *Streams* are lists like arrays, but they’re loaded in
+/// a lazy fashion.
+///
+/// Operations that return streams return a `cursor`.
+/// A cursor is a pointer into the result set. Instead of
+/// reading the results all at once like an array, you
+/// loop over the results, retrieving the next member of the
+/// set with each iteration. This makes it possible to
+/// efficiently work with large result sets.
+/// 
+/// (See “Working with Streams,” below, for some tips.)
+/// Streams are read-only; you can’t pass one as an input
+/// to an ReQL command meant to modify its input like
+/// `update` or `delete`.
+implement! { Stream }
+
+/// *Strings* are any valid UTF-8 string: `"superhero"`,
+/// `"ünnëcëssärÿ ümläüts"`. Strings may include the null
+/// code point (U+0000).
+implement! { String }
+
+/// *Tables* are RethinkDB database tables.
+///
+/// They behave like selections—they’re writable, as you can
+/// insert and delete documents in them. ReQL methods that
+/// use an index, like `get_all`, are only available on
+/// tables.
+implement! { Table }
+implement! { TableSlice }
 
 /// *Selections* represent subsets of tables, for example,
 /// the return values of `filter` or `get`.
@@ -127,34 +223,63 @@ pub struct Time(proto::Term);
 /// In most cases a table_slice behaves identically to a
 /// selection, but `between` can only be called on a table
 /// or a table_slice, not any other kind of selection.
+#[derive(Debug, Clone)]
 pub struct Selection<T>(T);
+implement! { Selection<Object> }
+implement! { Selection<Array> }
+implement! { Selection<Stream> }
 
-/// *Streams* are lists like arrays, but they’re loaded in
-/// a lazy fashion.
-///
-/// Operations that return streams return a `cursor`.
-/// A cursor is a pointer into the result set. Instead of
-/// reading the results all at once like an array, you
-/// loop over the results, retrieving the next member of the
-/// set with each iteration. This makes it possible to
-/// efficiently work with large result sets.
-/// 
-/// (See “Working with Streams,” below, for some tips.)
-/// Streams are read-only; you can’t pass one as an input
-/// to an ReQL command meant to modify its input like
-/// `update` or `delete`.
-pub struct Stream(proto::Term);
+pub trait DataType : Sized + From<Term> + Into<Term> {}
 
-/// *Strings* are any valid UTF-8 string: `"superhero"`,
-/// `"ünnëcëssärÿ ümläüts"`. Strings may include the null
-/// code point (U+0000).
-pub struct String(proto::Term);
+#[derive(Debug, Clone)]
+pub struct Command(Term);
 
-/// *Tables* are RethinkDB database tables.
-///
-/// They behave like selections—they’re writable, as you can
-/// insert and delete documents in them. ReQL methods that
-/// use an index, like `get_all`, are only available on
-/// tables.
-pub struct Table(proto::Term);
-pub struct TableSlice(proto::Term);
+impl Command {
+    pub fn new<T>(cmd_type: TermType, prev_cmd: Option<T>) -> Command
+        where T: DataType
+        {
+            let mut term = Term::new();
+            term.set_field_type(cmd_type);
+            if let Some(cmd) = prev_cmd {
+                let args = RepeatedField::from_vec(vec![cmd.into()]);
+                term.set_args(args);
+            }
+            Command(term)
+        }
+
+    pub fn set_args<T>(&mut self, args: T)
+        where T: DataType
+        {
+            self.0.mut_args().push(args.into());
+        }
+
+    pub fn set_opts(&mut self, opts: Object)
+        {
+            let mut term: Term = opts.into();
+            let opts = term.take_optargs().into_vec();
+            for opt in opts.into_iter() {
+                self.0.mut_optargs().push(opt);
+            }
+        }
+
+    pub fn into<T>(self) -> T
+        where T: From<Term>
+        {
+            From::from(self.0)
+        }
+}
+
+impl<T> From<T> for String
+    where T: Into<StdString>
+{
+    fn from(t: T) -> String {
+        let mut datum = Datum::new();
+        datum.set_field_type(DatumType::R_STR);
+        datum.set_r_str(t.into());
+        let mut output = String::new();
+        output.0.set_field_type(TermType::DATUM);
+        output.0.set_datum(datum);
+        output
+    }
+}
+
