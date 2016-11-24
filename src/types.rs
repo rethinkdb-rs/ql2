@@ -1,15 +1,15 @@
-use proto::{
-    Term_TermType as TermType,
-};
-
 use std::string::String as StdString;
 
 use proto::{
     Term, Datum,
+    Term_TermType as TermType,
     Datum_DatumType as DatumType,
 };
 
 use protobuf::repeated::RepeatedField;
+use serde_json::value::{ToJson, Value};
+
+include!(concat!(env!("OUT_DIR"), "/serde_types.rs"));
 
 macro_rules! implement {
     (Selection<$dt:ident>) => {
@@ -316,19 +316,35 @@ impl<T> From<T> for String
 }
 
 #[derive(Debug, Clone)]
-pub struct WithOpts<T, O>(T, Option<O>);
+pub struct WithOpts<T, O>(T, O);
 
 impl<T, O> WithOpts<T, O>
-    where T: DataType, O: Sized
+    where T: DataType, O: ToJson
 {
-    pub fn new(cmd: T, opts: Option<O>) -> WithOpts<T, O>
+    pub fn new(cmd: T, opts: O) -> WithOpts<T, O>
     {
         WithOpts(cmd, opts)
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct ChangesOpts;
+impl Default for TableOpts {
+    fn default() -> TableOpts {
+        TableOpts {
+            read_mode: ReadMode::Single,
+            identifier_format: IdentifierFormat::Name,
+        }
+    }
+}
 
-#[derive(Debug, Clone)]
-pub struct TableOpts;
+impl Default for ChangesOpts<bool> {
+    fn default() -> ChangesOpts<bool> {
+        ChangesOpts {
+            squash: false,
+            changefeed_queue_size: 100_000,
+            include_initial: true,
+            include_states: false,
+            include_offsets: false,
+            include_types: false,
+        }
+    }
+}
