@@ -20,7 +20,7 @@ use serde_json::value::ToJson;
 macro_rules! implement {
     ($cmd:ident for $dt:ident) => {
         impl commands::$cmd for types::$dt {}
-        impl<O> commands::$cmd for types::WithOpts<types::$dt, O> where O: Default + ToJson {}
+        impl<O> commands::$cmd for types::WithOpts<types::$dt, O> where O: Default + ToJson + Clone {}
     }
 }
 

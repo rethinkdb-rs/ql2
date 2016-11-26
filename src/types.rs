@@ -36,6 +36,28 @@ macro_rules! implement {
         }
     };
 
+    ($(#[$attr:meta])* pub struct Command) => {
+        $(
+            #[$attr]
+        )*
+        #[derive(Debug, Clone)]
+        pub struct Command(Term);
+
+        impl DataType for Command {}
+
+        impl From<Command> for Term {
+            fn from(t: Command) -> Term {
+                t.0
+            }
+        }
+
+        impl From<Term> for Command {
+            fn from(t: Term) -> Command {
+                Command(t)
+            }
+        }
+    };
+
     ($(#[$attr:meta])* pub struct $dt:ident) => {
         $(
             #[$attr]
@@ -65,7 +87,7 @@ macro_rules! implement {
     };
 }
 
-pub trait DataType : Sized + From<Term> + Into<Term> {}
+pub trait DataType : From<Term> + Into<Term> + Clone {}
 
 implement! {
     /// **Arrays** are lists of zero or more elements.
@@ -269,13 +291,17 @@ pub type ObjectSelection = Selection<Object>;
 pub type ArraySelection = Selection<Array>;
 pub type StreamSelection = Selection<Stream>;
 
+implement! {
+    pub struct Command
+}
+
 #[derive(Debug, Clone)]
 pub struct WithOpts<T, O>(T, O);
 
-impl<T, O> DataType for WithOpts<T, O> where T: From<Term> + Into<Term>, O: Default + ToJson { }
+impl<T, O> DataType for WithOpts<T, O> where T: DataType, O: Default + ToJson + Clone { }
 
 impl<T, O> WithOpts<T, O>
-    where T: From<Term> + Into<Term>, O: Default + ToJson
+    where T: DataType, O: Default + ToJson + Clone
 {
     pub fn new(cmd: T, opts: O) -> WithOpts<T, O>
     {
@@ -284,18 +310,18 @@ impl<T, O> WithOpts<T, O>
 }
 
 impl<T, O> From<WithOpts<T, O>> for Term
-    where T: From<Term> + Into<Term>, O: Default + ToJson
+    where T: DataType, O: Default + ToJson + Clone
 {
     fn from(t: WithOpts<T, O>) -> Term {
         let obj = Object::from(t.1);
-        let t = WithOpts(t.0, O::default());
-        let cmd = Command(t).with_opts(obj);
-        cmd.0.into()
+        let mut cmd = Command(t.0.into());
+        cmd.with_opts(obj);
+        cmd.into()
     }
 }
 
 impl<T, O> From<Term> for WithOpts<T, O>
-    where T: From<Term> + Into<Term>, O: Default + ToJson
+    where T: DataType, O: Default + ToJson + Clone
 {
     fn from(t: Term) -> WithOpts<T, O> {
         WithOpts(t.into(), Default::default())
@@ -325,34 +351,25 @@ impl<T> From<T> for String
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Command<T>(T);
-
-impl<T> DataType for Command<T> where T: From<Term> + Into<Term> {}
-
-impl<T> Command<T> where T: From<Term> + Into<Term> {
-    pub fn new(cmd_type: TermType, prev_cmd: Option<T>) -> Command<Term>
+impl Command {
+    pub fn new(cmd_type: TermType, prev_cmd: Option<Term>) -> Command
         {
             let mut term = Term::new();
             term.set_field_type(cmd_type);
             if let Some(cmd) = prev_cmd {
-                let args = RepeatedField::from_vec(vec![cmd.into()]);
+                let args = RepeatedField::from_vec(vec![cmd]);
                 term.set_args(args);
             }
             Command(term)
         }
 
-    pub fn with_args<A>(self, args: A) -> Command<Term>
-        where A: Into<Term>
+    pub fn with_args(&mut self, args: Term)
         {
-            let mut term: Term = self.0.into();
-            term.mut_args().push(args.into());
-            Command(term)
+            self.0.mut_args().push(args);
         }
 
-    pub fn with_opts(self, opts: Object) -> Command<Term>
+    pub fn with_opts(&mut self, opts: Object)
         {
-            let mut term: Term = self.0.into();
             let mut opts: Term = opts.into();
             if opts.has_datum() {
                 let mut datum = opts.take_datum();
@@ -365,34 +382,16 @@ impl<T> Command<T> where T: From<Term> + Into<Term> {
                         val.set_field_type(TermType::DATUM);
                         val.set_datum(pair.take_val());
                         term_pair.set_val(val);
-                        term.mut_optargs().push(term_pair);
+                        self.0.mut_optargs().push(term_pair);
                     }
                 }
             }
-            Command(term)
         }
 
     pub fn into<O>(self) -> O
-        where O: DataType
+        where O: From<Term>
     {
-        let term: Term = self.0.into();
-        From::from(term)
-    }
-}
-
-impl<T> From<Command<T>> for Term
-    where T: Into<Term>
-{
-    fn from(t: Command<T>) -> Term {
-        t.0.into()
-    }
-}
-
-impl<T> From<Term> for Command<T>
-    where T: From<Term>
-{
-    fn from(t: Term) -> Command<T> {
-        Command(From::from(t))
+        From::from(self.0)
     }
 }
 
