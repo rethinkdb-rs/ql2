@@ -3,7 +3,9 @@ use std::string::String as StdString;
 use proto::{
     Term, Datum,
     Term_TermType as TermType,
+    Term_AssocPair as TermPair,
     Datum_DatumType as DatumType,
+    Datum_AssocPair as DatumPair,
 };
 
 use protobuf::repeated::RepeatedField;
@@ -62,6 +64,8 @@ macro_rules! implement {
         }
     };
 }
+
+pub trait DataType : Sized + From<Term> + Into<Term> {}
 
 implement! {
     /// **Arrays** are lists of zero or more elements.
@@ -239,8 +243,8 @@ implement! {
 /// **Selections** represent subsets of tables, for example,
 /// the return values of `filter` or `get`.
 ///
-/// There are three kinds of selections: **Selection<Object>**,
-/// **Selection<Array>** and **Selection<Stream>**. The
+/// There are three kinds of selections: `Selection<Object>`,
+/// `Selection<Array>` and `Selection<Stream>`. The
 /// difference between selections and their non-selection
 /// counterparts is that selections are writable—their
 /// return values can be passed as inputs to ReQL commands
@@ -248,10 +252,10 @@ implement! {
 /// will return a Selection<Object> that could then be
 /// passed to an update or delete command.
 ///
-/// (Note: **singleSelection** is an older term for
+/// (Note: _singleSelection_ is an older term for
 /// Selection<Object>; they mean the same thing.)
 /// Some commands (`order_by` and `between`) return a data
-/// type similar to a selection called a **table**slice_.
+/// type similar to a selection called a `table_slice`.
 /// In most cases a table_slice behaves identically to a
 /// selection, but `between` can only be called on a table
 /// or a table_slice, not any other kind of selection.
@@ -261,44 +265,52 @@ implement! { Selection<Object> }
 implement! { Selection<Array> }
 implement! { Selection<Stream> }
 
-pub trait DataType : Sized + From<Term> + Into<Term> {}
+pub type ObjectSelection = Selection<Object>;
+pub type ArraySelection = Selection<Array>;
+pub type StreamSelection = Selection<Stream>;
 
 #[derive(Debug, Clone)]
-pub struct Command(Term);
+pub struct WithOpts<T, O>(T, O);
 
-impl Command {
-    pub fn new<T>(cmd_type: TermType, prev_cmd: Option<T>) -> Command
-        where T: DataType
-        {
-            let mut term = Term::new();
-            term.set_field_type(cmd_type);
-            if let Some(cmd) = prev_cmd {
-                let args = RepeatedField::from_vec(vec![cmd.into()]);
-                term.set_args(args);
-            }
-            Command(term)
-        }
+impl<T, O> DataType for WithOpts<T, O> where T: From<Term> + Into<Term>, O: Default + ToJson { }
 
-    pub fn set_args<T>(&mut self, args: T)
-        where T: DataType
-        {
-            self.0.mut_args().push(args.into());
-        }
+impl<T, O> WithOpts<T, O>
+    where T: From<Term> + Into<Term>, O: Default + ToJson
+{
+    pub fn new(cmd: T, opts: O) -> WithOpts<T, O>
+    {
+        WithOpts(cmd, opts)
+    }
+}
 
-    pub fn set_opts(&mut self, opts: Object)
-        {
-            let mut term: Term = opts.into();
-            let opts = term.take_optargs().into_vec();
-            for opt in opts.into_iter() {
-                self.0.mut_optargs().push(opt);
-            }
-        }
+impl<T, O> From<WithOpts<T, O>> for Term
+    where T: From<Term> + Into<Term>, O: Default + ToJson
+{
+    fn from(t: WithOpts<T, O>) -> Term {
+        let obj = Object::from(t.1);
+        let t = WithOpts(t.0, O::default());
+        let cmd = Command(t)
+            .with_opts::<Null>(obj);
+        let cmd: Term = cmd.0.into();
+        cmd
+    }
+}
 
-    pub fn into<T>(self) -> T
-        where T: From<Term>
-        {
-            From::from(self.0)
-        }
+impl<T, O> From<Term> for WithOpts<T, O>
+    where T: From<Term> + Into<Term>, O: Default + ToJson
+{
+    fn from(t: Term) -> WithOpts<T, O> {
+        WithOpts(t.into(), Default::default())
+    }
+}
+
+impl<T> From<T> for Object
+    where T: ToJson
+{
+    fn from(t: T) -> Object {
+        let term = Term::from_json(t);
+        From::from(term)
+    }
 }
 
 impl<T> From<T> for String
@@ -316,14 +328,126 @@ impl<T> From<T> for String
 }
 
 #[derive(Debug, Clone)]
-pub struct WithOpts<T, O>(T, O);
+pub struct Command<T>(T);
 
-impl<T, O> WithOpts<T, O>
-    where T: DataType, O: ToJson
+impl<T> DataType for Command<T> where T: From<Term> + Into<Term> {}
+
+impl<T> Command<T> where T: From<Term> + Into<Term> {
+    pub fn new<O>(cmd_type: TermType, prev_cmd: Option<T>) -> Command<O>
+        where O: From<Term>
+        {
+            let mut term = Term::new();
+            term.set_field_type(cmd_type);
+            if let Some(cmd) = prev_cmd {
+                let args = RepeatedField::from_vec(vec![cmd.into()]);
+                term.set_args(args);
+            }
+            Command(From::from(term))
+        }
+
+    pub fn with_args<A, O>(self, args: A) -> Command<O>
+        where A: Into<Term>, O: DataType
+        {
+            let mut term: Term = self.0.into();
+            term.mut_args().push(args.into());
+            Command(From::from(term))
+        }
+
+    pub fn with_opts<O>(self, opts: Object) -> Command<O>
+        where O: DataType
+        {
+            let mut term: Term = self.0.into();
+            let mut opts: Term = opts.into();
+            if opts.has_datum() {
+                let mut datum = opts.take_datum();
+                let pairs = datum.take_r_object().into_vec();
+                for mut pair in pairs {
+                    if pair.has_key() {
+                        let mut term_pair = TermPair::new();
+                        term_pair.set_key(pair.take_key());
+                        let mut val = Term::new();
+                        val.set_field_type(TermType::DATUM);
+                        val.set_datum(pair.take_val());
+                        term_pair.set_val(val);
+                        term.mut_optargs().push(term_pair);
+                    }
+                }
+            }
+            Command(From::from(term))
+        }
+}
+
+impl<T> From<Command<T>> for Term
+    where T: Into<Term>
 {
-    pub fn new(cmd: T, opts: O) -> WithOpts<T, O>
-    {
-        WithOpts(cmd, opts)
+    fn from(t: Command<T>) -> Term {
+        t.0.into()
+    }
+}
+
+impl<T> From<Term> for Command<T>
+    where T: From<Term>
+{
+    fn from(t: Term) -> Command<T> {
+        Command(From::from(t))
+    }
+}
+
+impl Term {
+    fn from_json<T: ToJson>(t: T) -> Term {
+        // Datum
+        let mut datum = Datum::new();
+        match t.to_json() {
+            Value::String(val) => {
+                datum.set_field_type(DatumType::R_STR);
+                datum.set_r_str(val);
+            },
+            Value::Bool(val) => {
+                datum.set_field_type(DatumType::R_BOOL);
+                datum.set_r_bool(val);
+            },
+            Value::I64(val) => {
+                datum.set_field_type(DatumType::R_NUM);
+                datum.set_r_num(val as f64);
+            },
+            Value::U64(val) => {
+                datum.set_field_type(DatumType::R_NUM);
+                datum.set_r_num(val as f64);
+            },
+            Value::F64(val) => {
+                datum.set_field_type(DatumType::R_NUM);
+                datum.set_r_num(val);
+            },
+            Value::Array(val) => {
+                datum.set_field_type(DatumType::R_ARRAY);
+                let args: Vec<Datum> = val.iter()
+                    .map(|a| Term::from_json(a).take_datum())
+                    .collect();
+                let arr = RepeatedField::from_vec(args);
+                datum.set_r_array(arr);
+            },
+            Value::Object(val) => {
+                datum.set_field_type(DatumType::R_OBJECT);
+                let args: Vec<DatumPair> = val.into_iter()
+                    .map(|(name, arg)| {
+                        let mut obj = DatumPair::new();
+                        obj.set_key(name.into());
+                        obj.set_val(Term::from_json(arg).take_datum());
+                        obj
+                    })
+                    .collect();
+                let obj = RepeatedField::from_vec(args);
+                datum.set_r_object(obj);
+            },
+            Value::Null => {
+                datum.set_field_type(DatumType::R_NULL);
+            },
+        }
+        // Term
+        let mut term = Term::new();
+        term.set_field_type(TermType::DATUM);
+        term.set_datum(datum);
+        term
     }
 }
 

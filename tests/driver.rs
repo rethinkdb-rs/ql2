@@ -1,6 +1,6 @@
 extern crate ql2;
 
-use ql2::commands::Command;
+use ql2::commands::*;
 
 pub struct Client;
 
@@ -9,5 +9,6 @@ impl Command for Client { }
 #[test]
 fn db_works() {
     let r = Client;
-    panic!(format!("{:?}", r.db("heroes")));
+    let query = r.db("heroes").table("marvel");
+    panic!(format!("{:?}", query.changes()));
 }

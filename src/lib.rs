@@ -15,8 +15,19 @@ pub mod types;
 pub mod errors;
 pub mod commands;
 
-impl commands::Db for types::Db {}
+use types::Command as Cmd;
+use serde_json::value::ToJson;
 
-impl commands::Stream for types::Stream {}
+type CmdWithOpts<T, O> = Cmd<types::WithOpts<T, O>>;
 
-impl commands::ObjectSelection for types::Selection<types::Object> {}
+macro_rules! implement {
+    ($cmd:ident for $dt:ident) => {
+        impl commands::$cmd for Cmd<types::$dt> {}
+        impl<O> commands::$cmd for CmdWithOpts<types::$dt, O> where O: Default + ToJson {}
+    }
+}
+
+implement!{ Table for Db }
+implement!{ Changes for Table }
+implement!{ Changes for Stream }
+implement!{ Changes for ObjectSelection }
