@@ -289,10 +289,8 @@ impl<T, O> From<WithOpts<T, O>> for Term
     fn from(t: WithOpts<T, O>) -> Term {
         let obj = Object::from(t.1);
         let t = WithOpts(t.0, O::default());
-        let cmd = Command(t)
-            .with_opts::<Null>(obj);
-        let cmd: Term = cmd.0.into();
-        cmd
+        let cmd = Command(t).with_opts(obj);
+        cmd.0.into()
     }
 }
 
@@ -333,8 +331,7 @@ pub struct Command<T>(T);
 impl<T> DataType for Command<T> where T: From<Term> + Into<Term> {}
 
 impl<T> Command<T> where T: From<Term> + Into<Term> {
-    pub fn new<O>(cmd_type: TermType, prev_cmd: Option<T>) -> Command<O>
-        where O: From<Term>
+    pub fn new(cmd_type: TermType, prev_cmd: Option<T>) -> Command<Term>
         {
             let mut term = Term::new();
             term.set_field_type(cmd_type);
@@ -342,19 +339,18 @@ impl<T> Command<T> where T: From<Term> + Into<Term> {
                 let args = RepeatedField::from_vec(vec![cmd.into()]);
                 term.set_args(args);
             }
-            Command(From::from(term))
+            Command(term)
         }
 
-    pub fn with_args<A, O>(self, args: A) -> Command<O>
-        where A: Into<Term>, O: DataType
+    pub fn with_args<A>(self, args: A) -> Command<Term>
+        where A: Into<Term>
         {
             let mut term: Term = self.0.into();
             term.mut_args().push(args.into());
-            Command(From::from(term))
+            Command(term)
         }
 
-    pub fn with_opts<O>(self, opts: Object) -> Command<O>
-        where O: DataType
+    pub fn with_opts(self, opts: Object) -> Command<Term>
         {
             let mut term: Term = self.0.into();
             let mut opts: Term = opts.into();
@@ -373,8 +369,15 @@ impl<T> Command<T> where T: From<Term> + Into<Term> {
                     }
                 }
             }
-            Command(From::from(term))
+            Command(term)
         }
+
+    pub fn into<O>(self) -> O
+        where O: DataType
+    {
+        let term: Term = self.0.into();
+        From::from(term)
+    }
 }
 
 impl<T> From<Command<T>> for Term

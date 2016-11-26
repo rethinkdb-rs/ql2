@@ -9,44 +9,46 @@ use proto::{
 
 use types::Command as Cmd;
 
-type CmdWithOpts<T, O> = Cmd<types::WithOpts<T, O>>;
-
 macro_rules! none {
     () => {None as Option<types::Null>}
 }
 
 pub trait Command where Self: Sized {
-    fn db<T>(self, arg: T) -> Cmd<types::Db>
+    fn db<T>(self, arg: T) -> types::Db
         where T: Into<types::String>
         {
-            Cmd::new::<Term>(TermType::DB, none!())
+            Cmd::new(TermType::DB, none!())
                 .with_args(arg.into())
+                .into()
         }
 
-    fn table<T>(self, arg: T) -> CmdWithOpts<types::Table, types::TableOpts>
+    fn table<T>(self, arg: T) -> types::WithOpts<types::Table, types::TableOpts>
         where T: Into<types::String>
         {
             self.db("test").table(arg)
         }
 
-    fn uuid(self) -> Cmd<types::String> {
+    fn uuid(self) -> types::String {
         Cmd::new(TermType::UUID, none!())
+                .into()
     }
 }
 
 pub trait Table where Self: Sized + From<Term> + Into<Term> {
-    fn table<T>(self, arg: T) -> CmdWithOpts<types::Table, types::TableOpts>
+    fn table<T>(self, arg: T) -> types::WithOpts<types::Table, types::TableOpts>
         where T: Into<types::String>
         {
-            Cmd::new::<Term>(TermType::TABLE, Some(self))
+            Cmd::new(TermType::TABLE, Some(self))
                 .with_args(arg.into())
+                .into()
         }
 }
 
 pub trait Changes where Self: Sized + From<Term> + Into<Term> {
-    fn changes<T>(self) -> CmdWithOpts<types::Stream, types::ChangesOpts<T>>
+    fn changes<T>(self) -> types::WithOpts<types::Stream, types::ChangesOpts<T>>
         where types::ChangesOpts<T>: Default + ToJson
         {
             Cmd::new(TermType::CHANGES, Some(self))
+                .into()
         }
 }

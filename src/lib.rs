@@ -15,15 +15,12 @@ pub mod types;
 pub mod errors;
 pub mod commands;
 
-use types::Command as Cmd;
 use serde_json::value::ToJson;
-
-type CmdWithOpts<T, O> = Cmd<types::WithOpts<T, O>>;
 
 macro_rules! implement {
     ($cmd:ident for $dt:ident) => {
-        impl commands::$cmd for Cmd<types::$dt> {}
-        impl<O> commands::$cmd for CmdWithOpts<types::$dt, O> where O: Default + ToJson {}
+        impl commands::$cmd for types::$dt {}
+        impl<O> commands::$cmd for types::WithOpts<types::$dt, O> where O: Default + ToJson {}
     }
 }
 
