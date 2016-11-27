@@ -9,7 +9,7 @@ use proto::{
 use types::Command as Cmd;
 
 pub use types::{
-    WithTableOpts, WithChangesOpts
+    WithTableOpts, WithChangesOpts, WithGetAllOpts
 };
 
 pub trait Command where Self: Sized {
@@ -63,8 +63,9 @@ pub trait Get where Self: types::DataType {
 }
 
 pub trait GetAll where Self: types::DataType {
-    fn get_all<T>(&self, arg: T) -> types::StreamSelection
+    fn get_all<T>(&self, arg: T) -> types::WithOpts<types::StreamSelection, types::GetAllOpts>
         where T: Into<types::SecondaryKey>,
+              types::GetAllOpts: Default + ToJson + Clone
     {
         Cmd::new(TermType::GET_ALL, Some(self.clone().into()))
             .with_args(arg.into().into())

@@ -30,4 +30,5 @@ implement!{ Get => Table }
 implement!{ GetAll => Table }
 implement!{ Changes => Table }
 implement!{ Changes => Stream }
+implement!{ Changes => StreamSelection }
 implement!{ Changes => ObjectSelection }

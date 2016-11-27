@@ -15,7 +15,8 @@ fn db_works() {
 
     let query = r.db("heroes")
         .table("marvel").read_mode(Outdated).identifier_format(Uuid)
-        .get_all(("spiderman", "Nickname"));
+        .get_all("spiderman").index("Nickname")
+        .changes();
 
     panic!(format!("{:?}", query));
 }

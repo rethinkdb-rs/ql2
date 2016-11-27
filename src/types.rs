@@ -436,20 +436,6 @@ key_from_st!{ f64 }
 key_from_st!{ i64 }
 key_from_st!{ u64 }
 
-impl<'a> From<(&'a str, &'a str)> for SecondaryKey {
-    fn from(t: (&'a str, &'a str)) -> SecondaryKey {
-        let opt = GetAllOpts {
-            index: t.1.to_string(),
-        };
-        let opt = Term::from_json(opt);
-        let obj = Object::from(opt);
-        let dt = String::from(t.0);
-        Command(dt.into())
-            .with_opts(obj)
-            .into()
-    }
-}
-
 impl Command {
     pub fn new(cmd_type: TermType, prev_cmd: Option<Term>) -> Command
         {
@@ -627,6 +613,19 @@ impl<T, A> WithChangesOpts<T, A> for WithOpts<T, ChangesOpts<A>>
 
     fn include_types(mut self, arg: bool) -> Self {
         self.1.include_types = arg;
+        self
+    }
+}
+
+pub trait WithGetAllOpts : DataType {
+    fn index(mut self, arg: &str) -> Self;
+}
+
+impl<T> WithGetAllOpts for WithOpts<T, GetAllOpts>
+    where T: DataType
+{
+    fn index(mut self, arg: &str) -> Self {
+        self.1.index = arg.to_string();
         self
     }
 }
