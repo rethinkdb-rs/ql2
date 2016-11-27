@@ -351,6 +351,20 @@ impl<T> From<T> for String
     }
 }
 
+impl<T> From<T> for Number
+    where T: Into<f64>
+{
+    fn from(t: T) -> Number {
+        let mut datum = Datum::new();
+        datum.set_field_type(DatumType::R_NUM);
+        datum.set_r_num(t.into());
+        let mut output = Number::new();
+        output.0.set_field_type(TermType::DATUM);
+        output.0.set_datum(datum);
+        output
+    }
+}
+
 impl Command {
     pub fn new(cmd_type: TermType, prev_cmd: Option<Term>) -> Command
         {

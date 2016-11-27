@@ -51,3 +51,14 @@ pub trait Changes where Self: types::DataType {
                 .into()
         }
 }
+
+pub trait Get where Self: types::DataType {
+    fn get<A, T>(&self, arg: A) -> types::ObjectSelection
+        where A: Into<T>, T: types::DataType + From<A>
+        {
+            let arg: T = arg.into();
+            Cmd::new(TermType::GET, Some(self.clone().into()))
+                .with_args(arg.into())
+                .into()
+        }
+}

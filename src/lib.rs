@@ -25,6 +25,7 @@ macro_rules! implement {
 }
 
 implement!{ Table for Db }
+implement!{ Get for Table }
 implement!{ Changes for Table }
 implement!{ Changes for Stream }
 implement!{ Changes for ObjectSelection }
