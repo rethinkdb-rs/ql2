@@ -453,24 +453,79 @@ impl Term {
     }
 }
 
-impl Default for TableOpts {
-    fn default() -> TableOpts {
-        TableOpts {
-            read_mode: ReadMode::Single,
-            identifier_format: IdentifierFormat::Name,
-        }
+pub trait WithTableOpts : DataType {
+    fn read_mode(mut self, arg: ReadMode) -> Self;
+    fn identifier_format(mut self, arg: IdentifierFormat) -> Self;
+}
+
+impl<T> WithTableOpts for WithOpts<T, TableOpts>
+    where T: DataType
+{
+    fn read_mode(mut self, arg: ReadMode) -> Self {
+        self.1.read_mode = arg;
+        self
+    }
+
+    fn identifier_format(mut self, arg: IdentifierFormat) -> Self {
+        self.1.identifier_format = arg;
+        self
     }
 }
 
-impl Default for ChangesOpts<bool> {
-    fn default() -> ChangesOpts<bool> {
-        ChangesOpts {
-            squash: false,
-            changefeed_queue_size: 100_000,
-            include_initial: true,
-            include_states: false,
-            include_offsets: false,
-            include_types: false,
-        }
+pub trait WithChangesOpts<T: DataType, A: SquashArg> : DataType {
+    fn squash<B>(mut self, arg: B) -> WithOpts<T, ChangesOpts<B>>
+        where B: SquashArg, ChangesOpts<B>: Default + ToJson + Clone;
+    fn changefeed_queue_size(mut self, arg: u64) -> Self;
+    fn include_initial(mut self, arg: bool) -> Self;
+    fn include_states(mut self, arg: bool) -> Self;
+    fn include_offsets(mut self, arg: bool) -> Self;
+    fn include_types(mut self, arg: bool) -> Self;
+}
+
+pub trait SquashArg where Self: ToJson + Clone {}
+
+impl SquashArg for bool {}
+impl SquashArg for f32 {}
+
+impl<T, A> WithChangesOpts<T, A> for WithOpts<T, ChangesOpts<A>>
+    where T: DataType, A: SquashArg, ChangesOpts<A>: Default + ToJson + Clone
+{
+    fn squash<B>(self, arg: B) -> WithOpts<T, ChangesOpts<B>>
+        where B: SquashArg, ChangesOpts<B>: Default + ToJson + Clone
+    {
+        let opts: ChangesOpts<B> = ChangesOpts {
+            squash: arg,
+            changefeed_queue_size: self.1.changefeed_queue_size,
+            include_initial: self.1.include_initial,
+            include_states: self.1.include_states,
+            include_offsets: self.1.include_offsets,
+            include_types: self.1.include_types,
+        };
+        WithOpts(self.0, opts)
+    }
+
+    fn changefeed_queue_size(mut self, arg: u64) -> Self {
+        self.1.changefeed_queue_size = arg;
+        self
+    }
+
+    fn include_initial(mut self, arg: bool) -> Self {
+        self.1.include_initial = arg;
+        self
+    }
+
+    fn include_states(mut self, arg: bool) -> Self {
+        self.1.include_states = arg;
+        self
+    }
+
+    fn include_offsets(mut self, arg: bool) -> Self {
+        self.1.include_offsets = arg;
+        self
+    }
+
+    fn include_types(mut self, arg: bool) -> Self {
+        self.1.include_types = arg;
+        self
     }
 }

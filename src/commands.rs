@@ -8,6 +8,10 @@ use proto::{
 
 use types::Command as Cmd;
 
+pub use types::{
+    WithTableOpts, WithChangesOpts
+};
+
 pub trait Command where Self: Sized {
     fn db<T>(&self, arg: T) -> types::Db
         where T: Into<types::String>
@@ -40,8 +44,8 @@ pub trait Table where Self: types::DataType {
 }
 
 pub trait Changes where Self: types::DataType {
-    fn changes<T>(&self) -> types::WithOpts<types::Stream, types::ChangesOpts<T>>
-        where types::ChangesOpts<T>: Default + ToJson + Clone
+    fn changes(&self) -> types::WithOpts<types::Stream, types::ChangesOpts<bool>>
+        where types::ChangesOpts<bool>: Default + ToJson + Clone
         {
             Cmd::new(TermType::CHANGES, Some(self.clone().into()))
                 .into()
