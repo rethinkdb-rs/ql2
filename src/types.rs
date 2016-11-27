@@ -295,6 +295,10 @@ implement! {
     pub struct Command
 }
 
+implement! {
+    pub struct PrimaryKey
+}
+
 #[derive(Debug, Clone)]
 pub struct WithOpts<T, O>(T, O);
 
@@ -364,6 +368,48 @@ impl<T> From<T> for Number
         output
     }
 }
+
+macro_rules! pk_from_dt {
+    ($T:ty) => {
+        impl From<$T> for PrimaryKey {
+            fn from(t: $T) -> PrimaryKey {
+                let term: Term = t.into();
+                From::from(term)
+            }
+        }
+    }
+}
+
+pk_from_dt!{ String }
+pk_from_dt!{ Number }
+pk_from_dt!{ Bool }
+
+impl<'a> From<&'a str> for PrimaryKey {
+    fn from(t: &'a str) -> PrimaryKey {
+        let dt = String::from(t);
+        From::from(dt)
+    }
+}
+
+macro_rules! pk_from_st {
+    ( $T:ident ) => {
+        impl From<$T> for PrimaryKey {
+            fn from(t: $T) -> PrimaryKey {
+                let term = Term::from_json(t);
+                From::from(term)
+            }
+        }
+    };
+}
+
+pk_from_st!{ StdString }
+pk_from_st!{ bool }
+pk_from_st!{ f32 }
+pk_from_st!{ i32 }
+pk_from_st!{ u32 }
+pk_from_st!{ f64 }
+pk_from_st!{ i64 }
+pk_from_st!{ u64 }
 
 impl Command {
     pub fn new(cmd_type: TermType, prev_cmd: Option<Term>) -> Command

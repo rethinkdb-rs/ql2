@@ -15,17 +15,18 @@ pub mod types;
 pub mod errors;
 pub mod commands;
 
+use commands::*;
 use serde_json::value::ToJson;
 
 macro_rules! implement {
-    ($cmd:ident for $dt:ident) => {
-        impl commands::$cmd for types::$dt {}
-        impl<O> commands::$cmd for types::WithOpts<types::$dt, O> where O: Default + ToJson + Clone {}
+    ($cmd:ty => $dt:ident) => {
+        impl $cmd for types::$dt {}
+        impl<O> $cmd for types::WithOpts<types::$dt, O> where O: Default + ToJson + Clone {}
     }
 }
 
-implement!{ Table for Db }
-implement!{ Get for Table }
-implement!{ Changes for Table }
-implement!{ Changes for Stream }
-implement!{ Changes for ObjectSelection }
+implement!{ Table => Db }
+implement!{ Get => Table }
+implement!{ Changes => Table }
+implement!{ Changes => Stream }
+implement!{ Changes => ObjectSelection }
