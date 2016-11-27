@@ -16,9 +16,9 @@ pub trait Command where Self: Sized {
     fn db<T>(&self, arg: T) -> types::Db
         where T: Into<types::String>
         {
-            let mut cmd = Cmd::new(TermType::DB, None);
-            cmd.with_args(arg.into().into());
-            cmd.into()
+            Cmd::new(TermType::DB, None)
+                .with_args(arg.into().into())
+                .into()
         }
 
     fn table<T>(&self, arg: T) -> types::WithOpts<types::Table, types::TableOpts>
@@ -37,9 +37,9 @@ pub trait Table where Self: types::DataType {
     fn table<T>(&self, arg: T) -> types::WithOpts<types::Table, types::TableOpts>
         where T: Into<types::String>
         {
-            let mut cmd = Cmd::new(TermType::TABLE, Some(self.clone().into()));
-            cmd.with_args(arg.into().into());
-            cmd.into()
+            Cmd::new(TermType::TABLE, Some(self.clone().into()))
+                .with_args(arg.into().into())
+                .into()
         }
 }
 

@@ -314,9 +314,9 @@ impl<T, O> From<WithOpts<T, O>> for Term
 {
     fn from(t: WithOpts<T, O>) -> Term {
         let obj = Object::from(t.1);
-        let mut cmd = Command(t.0.into());
-        cmd.with_opts(obj);
-        cmd.into()
+        Command(t.0.into())
+            .with_opts(obj)
+            .into()
     }
 }
 
@@ -363,12 +363,13 @@ impl Command {
             Command(term)
         }
 
-    pub fn with_args(&mut self, args: Term)
+    pub fn with_args(mut self, args: Term) -> Self
         {
             self.0.mut_args().push(args);
+            self
         }
 
-    pub fn with_opts(&mut self, opts: Object)
+    pub fn with_opts(mut self, opts: Object) -> Self
         {
             let mut opts: Term = opts.into();
             if opts.has_datum() {
@@ -386,6 +387,7 @@ impl Command {
                     }
                 }
             }
+            self
         }
 
     pub fn into<O>(self) -> O
@@ -493,7 +495,7 @@ impl<T, A> WithChangesOpts<T, A> for WithOpts<T, ChangesOpts<A>>
     fn squash<B>(self, arg: B) -> WithOpts<T, ChangesOpts<B>>
         where B: SquashArg, ChangesOpts<B>: Default + ToJson + Clone
     {
-        let opts: ChangesOpts<B> = ChangesOpts {
+        let opts = ChangesOpts {
             squash: arg,
             changefeed_queue_size: self.1.changefeed_queue_size,
             include_initial: self.1.include_initial,
