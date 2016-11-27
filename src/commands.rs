@@ -64,7 +64,7 @@ pub trait Get where Self: types::DataType {
 
 pub trait GetAll where Self: types::DataType {
     fn get_all<T>(&self, arg: T) -> types::StreamSelection
-        where T: Into<types::PrimaryKey>,
+        where T: Into<types::SecondaryKey>,
     {
         Cmd::new(TermType::GET_ALL, Some(self.clone().into()))
             .with_args(arg.into().into())

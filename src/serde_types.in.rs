@@ -118,5 +118,5 @@ default_changes_opts!{ f32 is 0.0 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GetAllOpts {
-    index: String,
+    index: StdString,
 }

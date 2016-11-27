@@ -299,6 +299,10 @@ implement! {
     pub struct PrimaryKey
 }
 
+implement! {
+    pub struct SecondaryKey
+}
+
 #[derive(Debug, Clone)]
 pub struct WithOpts<T, O>(T, O);
 
@@ -369,7 +373,7 @@ impl<T> From<T> for Number
     }
 }
 
-macro_rules! pk_from_dt {
+macro_rules! key_from_dt {
     ($T:ty) => {
         impl From<$T> for PrimaryKey {
             fn from(t: $T) -> PrimaryKey {
@@ -377,12 +381,19 @@ macro_rules! pk_from_dt {
                 From::from(term)
             }
         }
+
+        impl From<$T> for SecondaryKey {
+            fn from(t: $T) -> SecondaryKey {
+                let term: Term = t.into();
+                From::from(term)
+            }
+        }
     }
 }
 
-pk_from_dt!{ String }
-pk_from_dt!{ Number }
-pk_from_dt!{ Bool }
+key_from_dt!{ String }
+key_from_dt!{ Number }
+key_from_dt!{ Bool }
 
 impl<'a> From<&'a str> for PrimaryKey {
     fn from(t: &'a str) -> PrimaryKey {
@@ -391,7 +402,14 @@ impl<'a> From<&'a str> for PrimaryKey {
     }
 }
 
-macro_rules! pk_from_st {
+impl<'a> From<&'a str> for SecondaryKey {
+    fn from(t: &'a str) -> SecondaryKey {
+        let dt = String::from(t);
+        From::from(dt)
+    }
+}
+
+macro_rules! key_from_st {
     ( $T:ident ) => {
         impl From<$T> for PrimaryKey {
             fn from(t: $T) -> PrimaryKey {
@@ -399,17 +417,38 @@ macro_rules! pk_from_st {
                 From::from(term)
             }
         }
+
+        impl From<$T> for SecondaryKey {
+            fn from(t: $T) -> SecondaryKey {
+                let term = Term::from_json(t);
+                From::from(term)
+            }
+        }
     };
 }
 
-pk_from_st!{ StdString }
-pk_from_st!{ bool }
-pk_from_st!{ f32 }
-pk_from_st!{ i32 }
-pk_from_st!{ u32 }
-pk_from_st!{ f64 }
-pk_from_st!{ i64 }
-pk_from_st!{ u64 }
+key_from_st!{ StdString }
+key_from_st!{ bool }
+key_from_st!{ f32 }
+key_from_st!{ i32 }
+key_from_st!{ u32 }
+key_from_st!{ f64 }
+key_from_st!{ i64 }
+key_from_st!{ u64 }
+
+impl<'a> From<(&'a str, &'a str)> for SecondaryKey {
+    fn from(t: (&'a str, &'a str)) -> SecondaryKey {
+        let opt = GetAllOpts {
+            index: t.1.to_string(),
+        };
+        let opt = Term::from_json(opt);
+        let obj = Object::from(opt);
+        let dt = String::from(t.0);
+        Command(dt.into())
+            .with_opts(obj)
+            .into()
+    }
+}
 
 impl Command {
     pub fn new(cmd_type: TermType, prev_cmd: Option<Term>) -> Command
