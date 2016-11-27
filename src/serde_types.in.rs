@@ -115,3 +115,8 @@ macro_rules! default_changes_opts {
 
 default_changes_opts!{ bool is false }
 default_changes_opts!{ f32 is 0.0 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GetAllOpts {
+    index: String,
+}

@@ -27,6 +27,7 @@ macro_rules! implement {
 
 implement!{ Table => Db }
 implement!{ Get => Table }
+implement!{ GetAll => Table }
 implement!{ Changes => Table }
 implement!{ Changes => Stream }
 implement!{ Changes => ObjectSelection }
