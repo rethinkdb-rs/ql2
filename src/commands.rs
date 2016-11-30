@@ -12,25 +12,45 @@ pub use types::{
     WithTableOpts, WithChangesOpts, WithGetAllOpts
 };
 
-pub trait Command where Self: Sized {
-    fn db<T>(&self, arg: T) -> types::Db
-        where T: Into<types::String>
+#[allow(non_upper_case_globals)]
+pub const r: Command = Command;
+
+impl Client for Command {}
+
+pub struct Command;
+
+#[allow(dead_code)]
+impl Command {
+    pub fn db<T>(&self, arg: T) -> types::Db where
+        T: Into<types::String>
         {
             Cmd::new(TermType::DB, None)
                 .with_args(arg.into().into())
                 .into()
         }
 
-    fn table<T>(&self, arg: T) -> types::WithOpts<types::Table, types::TableOpts>
-        where T: Into<types::String>
-        {
-            self.db("test").table(arg)
-        }
-
-    fn uuid(&self) -> types::String {
+    pub fn uuid(&self) -> types::String {
         Cmd::new(TermType::UUID, None)
             .into()
     }
+
+    pub fn map<T, F, O>(&self, arg: T, func: F) -> O where
+        T: Into<types::String>,
+        F: FnOnce(types::String),
+        O: types::DataType
+        {
+            Cmd::new(TermType::MAP, None)
+                .with_args(arg.into().into())
+                .into()
+        }
+}
+
+pub trait Client {
+    fn table<T>(&self, arg: T) -> types::WithOpts<types::Table, types::TableOpts> where
+        T: Into<types::String>
+        {
+            r.db("test").table(arg)
+        }
 }
 
 pub trait Table where Self: types::DataType {
@@ -71,4 +91,24 @@ pub trait GetAll where Self: types::DataType {
             .with_args(arg.into().into())
             .into()
     }
+}
+
+pub trait GetField where Self: types::DataType {
+    fn get_field<T, O>(&self, arg: T) -> O
+        where T: Into<types::String>, O: types::DataType
+        {
+            Cmd::new(TermType::GET_FIELD, Some(self.clone().into()))
+                .with_args(arg.into().into())
+                .into()
+        }
+}
+
+pub trait GetFieldArray where Self: types::DataType {
+    fn get_field<T>(&self, arg: T) -> types::Array
+        where T: Into<types::String>
+        {
+            Cmd::new(TermType::GET_FIELD, Some(self.clone().into()))
+                .with_args(arg.into().into())
+                .into()
+        }
 }

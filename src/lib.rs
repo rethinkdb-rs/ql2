@@ -32,3 +32,7 @@ implement!{ Changes => Table }
 implement!{ Changes => Stream }
 implement!{ Changes => StreamSelection }
 implement!{ Changes => ObjectSelection }
+implement!{ GetField => Object }
+implement!{ GetField => ObjectSelection }
+implement!{ GetFieldArray => Array }
+implement!{ GetFieldArray => ArraySelection }
