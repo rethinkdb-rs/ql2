@@ -34,10 +34,18 @@ impl Command {
             .into()
     }
 
-    pub fn map<T, F, O>(&self, arg: T, func: F) -> O where
+    pub fn map<T, F>(&self, arg: T, func: F) -> types::Stream where
         T: Into<types::String>,
         F: FnOnce(types::String),
-        O: types::DataType
+        {
+            Cmd::new(TermType::MAP, None)
+                .with_args(arg.into().into())
+                .into()
+        }
+
+    pub fn map_arr<T, F>(&self, arg: T, func: F) -> types::Array where
+        T: Into<types::String>,
+        F: FnOnce(types::String),
         {
             Cmd::new(TermType::MAP, None)
                 .with_args(arg.into().into())
