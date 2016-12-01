@@ -11,8 +11,6 @@ use proto::{
 use protobuf::repeated::RepeatedField;
 use serde_json::value::{ToJson, Value};
 
-include!(concat!(env!("OUT_DIR"), "/serde_types.rs"));
-
 macro_rules! implement {
     (Selection<$dt:ident>) => {
         impl DataType for Selection<$dt> {}
@@ -537,95 +535,5 @@ impl Term {
         term.set_field_type(TermType::DATUM);
         term.set_datum(datum);
         term
-    }
-}
-
-pub trait WithTableOpts : DataType {
-    fn read_mode(mut self, arg: ReadMode) -> Self;
-    fn identifier_format(mut self, arg: IdentifierFormat) -> Self;
-}
-
-impl<T> WithTableOpts for WithOpts<T, TableOpts>
-    where T: DataType
-{
-    fn read_mode(mut self, arg: ReadMode) -> Self {
-        self.1.read_mode = arg;
-        self
-    }
-
-    fn identifier_format(mut self, arg: IdentifierFormat) -> Self {
-        self.1.identifier_format = arg;
-        self
-    }
-}
-
-pub trait WithChangesOpts<T: DataType, A: SquashArg> : DataType {
-    fn squash<B>(mut self, arg: B) -> WithOpts<T, ChangesOpts<B>>
-        where B: SquashArg, ChangesOpts<B>: Default + ToJson + Clone;
-    fn changefeed_queue_size(mut self, arg: u64) -> Self;
-    fn include_initial(mut self, arg: bool) -> Self;
-    fn include_states(mut self, arg: bool) -> Self;
-    fn include_offsets(mut self, arg: bool) -> Self;
-    fn include_types(mut self, arg: bool) -> Self;
-}
-
-pub trait SquashArg where Self: ToJson + Clone {}
-
-impl SquashArg for bool {}
-impl SquashArg for f32 {}
-
-impl<T, A> WithChangesOpts<T, A> for WithOpts<T, ChangesOpts<A>>
-    where T: DataType, A: SquashArg, ChangesOpts<A>: Default + ToJson + Clone
-{
-    fn squash<B>(self, arg: B) -> WithOpts<T, ChangesOpts<B>>
-        where B: SquashArg, ChangesOpts<B>: Default + ToJson + Clone
-    {
-        let opts = ChangesOpts {
-            squash: arg,
-            changefeed_queue_size: self.1.changefeed_queue_size,
-            include_initial: self.1.include_initial,
-            include_states: self.1.include_states,
-            include_offsets: self.1.include_offsets,
-            include_types: self.1.include_types,
-        };
-        WithOpts(self.0, opts)
-    }
-
-    fn changefeed_queue_size(mut self, arg: u64) -> Self {
-        self.1.changefeed_queue_size = arg;
-        self
-    }
-
-    fn include_initial(mut self, arg: bool) -> Self {
-        self.1.include_initial = arg;
-        self
-    }
-
-    fn include_states(mut self, arg: bool) -> Self {
-        self.1.include_states = arg;
-        self
-    }
-
-    fn include_offsets(mut self, arg: bool) -> Self {
-        self.1.include_offsets = arg;
-        self
-    }
-
-    fn include_types(mut self, arg: bool) -> Self {
-        self.1.include_types = arg;
-        self
-    }
-}
-
-pub trait WithGetAllOpts : DataType {
-    fn index(mut self, arg: &str) -> Self;
-}
-
-impl<T> WithGetAllOpts for WithOpts<T, GetAllOpts>
-    where T: DataType
-{
-    fn index(mut self, arg: &str) -> Self {
-        self.1.index = arg.to_string();
-        self
     }
 }

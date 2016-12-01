@@ -120,13 +120,3 @@ default_changes_opts!{ f32 is 0.0 }
 pub struct GetAllOpts {
     index: StdString,
 }
-
-impl Default for GetAllOpts {
-    fn default() -> GetAllOpts {
-        GetAllOpts {
-            // All options must have default values so we will use a
-            // unique UUID instead and handle it when encoding.
-            index: "fd43ccb8-13d7-49c5-8ef1-7ef429c9b290".to_string(),
-        }
-    }
-}

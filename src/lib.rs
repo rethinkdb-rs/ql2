@@ -14,25 +14,3 @@ pub mod proto;
 pub mod types;
 pub mod errors;
 pub mod commands;
-
-use commands::*;
-use serde_json::value::ToJson;
-
-macro_rules! implement {
-    ($cmd:ty => $dt:ident) => {
-        impl $cmd for types::$dt {}
-        impl<O> $cmd for types::WithOpts<types::$dt, O> where O: Default + ToJson + Clone {}
-    }
-}
-
-implement!{ Table => Db }
-implement!{ Get => Table }
-implement!{ GetAll => Table }
-implement!{ Changes => Table }
-implement!{ Changes => Stream }
-implement!{ Changes => StreamSelection }
-implement!{ Changes => ObjectSelection }
-implement!{ GetField => Object }
-implement!{ GetField => ObjectSelection }
-implement!{ GetFieldArray => Array }
-implement!{ GetFieldArray => ArraySelection }
