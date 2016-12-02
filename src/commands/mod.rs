@@ -33,7 +33,7 @@ use types::Command as Cmd;
 include!(concat!(env!("OUT_DIR"), "/serde_types.rs"));
 
 #[allow(non_upper_case_globals)]
-pub const r: Client = Client;
+pub const r: Client = Command((), None);
 
 impl RootCommand for Client {}
 
@@ -45,10 +45,10 @@ pub trait RootCommand {
         }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Command<T, O>(T, Option<O>);
 
-pub struct Client;
+pub type Client = Command<(), ()>;
 
 impl Cmd {
     pub fn make<A, T, O, PT, PO>(typ: TermType, arg: Option<A>, opts: Option<O>, cmd: Option<&Command<PT, PO>>) -> Command<T, O>
