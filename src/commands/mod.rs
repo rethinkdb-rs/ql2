@@ -61,11 +61,11 @@ impl Cmd {
             };
             let mut dt = Cmd::new(typ, prev_cmd);
             if let Some(arg) = arg {
-                dt = dt.with_args(arg.into());
+                dt.with_args(arg.into());
             }
             if let Some(opt) = prev_opts {
                 let obj = types::Object::from(opt);
-                dt = dt.with_opts(obj);
+                dt.with_opts(obj);
             }
             Command(dt.into(), opts)
         }
@@ -80,7 +80,7 @@ O: ToJson + Clone
         let mut cmd: Cmd = term.into();
         if let Some(opt) = t.1 {
             let obj = types::Object::from(opt);
-            cmd = cmd.with_opts(obj);
+            cmd.with_opts(obj);
         }
         cmd.into()
     }

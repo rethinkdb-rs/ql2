@@ -320,9 +320,9 @@ impl<T, O> From<WithOpts<T, O>> for Term
 {
     fn from(t: WithOpts<T, O>) -> Term {
         let obj = Object::from(t.1);
-        Command(t.0.into())
-            .with_opts(obj)
-            .into()
+        let mut cmd = Command(t.0.into());
+        cmd.with_opts(obj);
+        cmd.into()
     }
 }
 
@@ -446,13 +446,13 @@ impl Command {
             Command(term)
         }
 
-    pub fn with_args(mut self, args: Term) -> Self
+    pub fn with_args(&mut self, args: Term) -> &mut Self
         {
             self.0.mut_args().push(args);
             self
         }
 
-    pub fn with_opts(mut self, opts: Object) -> Self
+    pub fn with_opts(&mut self, opts: Object) -> &mut Self
         {
             let mut opts: Term = opts.into();
             if opts.has_datum() {
