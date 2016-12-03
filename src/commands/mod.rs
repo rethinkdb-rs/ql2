@@ -1,13 +1,5 @@
-#![macro_use]
-
-macro_rules! Root {
-    () => {None as Option<&Command<types::Null, ()>>}
-}
-
-macro_rules! NoArg {
-    () => {None as Option<types::Null>}
-}
-
+#[macro_use]
+mod macros;
 pub mod db;
 pub mod table;
 pub mod uuid;
@@ -25,12 +17,16 @@ use types;
 use serde_json::value::{ToJson, Value};
 
 use proto::{
+    Term,
     Term_TermType as TermType,
 };
 
 use types::Command as Cmd;
 
 include!(concat!(env!("OUT_DIR"), "/serde_types.rs"));
+
+/// Convenient type for use with maps
+pub type Arg = Command<types::Object, ()>;
 
 #[allow(non_upper_case_globals)]
 pub const r: Client = Command((), None);
@@ -73,4 +69,19 @@ impl Cmd {
             }
             Command(dt.into(), opts)
         }
+}
+
+impl<T, O> From<Command<T, O>> for Term where
+T: types::DataType,
+O: ToJson + Clone
+{
+    fn from(t: Command<T, O>) -> Term {
+        let term: Term = t.0.into();
+        let mut cmd: Cmd = term.into();
+        if let Some(opt) = t.1 {
+            let obj = types::Object::from(opt);
+            cmd = cmd.with_opts(obj);
+        }
+        cmd.into()
+    }
 }
