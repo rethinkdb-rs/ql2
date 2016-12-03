@@ -5,8 +5,7 @@ use super::{Command, Client};
 
 #[allow(dead_code)]
 impl Client {
-    pub fn uuid(&self) -> Command<types::String, ()>
-    {
+    pub fn uuid(&self) -> Command<types::String, ()> {
         Cmd::make(TermType::UUID, NoArg!(), None, Root!())
     }
 }

@@ -1,12 +1,7 @@
 use std::string::String as StdString;
 
-use proto::{
-    Term, Datum,
-    Term_TermType as TermType,
-    Term_AssocPair as TermPair,
-    Datum_DatumType as DatumType,
-    Datum_AssocPair as DatumPair,
-};
+use proto::{Term, Datum, Term_TermType as TermType, Term_AssocPair as TermPair,
+            Datum_DatumType as DatumType, Datum_AssocPair as DatumPair};
 
 use protobuf::repeated::RepeatedField;
 use serde_json::value::{ToJson, Value};
@@ -85,7 +80,7 @@ macro_rules! implement {
     };
 }
 
-pub trait DataType : From<Term> + Into<Term> + Clone {}
+pub trait DataType: From<Term> + Into<Term> + Clone {}
 
 implement! {
     /// **Arrays** are lists of zero or more elements.
@@ -304,19 +299,24 @@ implement! {
 #[derive(Debug, Clone)]
 pub struct WithOpts<T, O>(T, O);
 
-impl<T, O> DataType for WithOpts<T, O> where T: DataType, O: Default + ToJson + Clone { }
+impl<T, O> DataType for WithOpts<T, O>
+    where T: DataType,
+          O: Default + ToJson + Clone
+{
+}
 
 impl<T, O> WithOpts<T, O>
-    where T: DataType, O: Default + ToJson + Clone
+    where T: DataType,
+          O: Default + ToJson + Clone
 {
-    pub fn new(cmd: T, opts: O) -> WithOpts<T, O>
-    {
+    pub fn new(cmd: T, opts: O) -> WithOpts<T, O> {
         WithOpts(cmd, opts)
     }
 }
 
 impl<T, O> From<WithOpts<T, O>> for Term
-    where T: DataType, O: Default + ToJson + Clone
+    where T: DataType,
+          O: Default + ToJson + Clone
 {
     fn from(t: WithOpts<T, O>) -> Term {
         let obj = Object::from(t.1);
@@ -327,7 +327,8 @@ impl<T, O> From<WithOpts<T, O>> for Term
 }
 
 impl<T, O> From<Term> for WithOpts<T, O>
-    where T: DataType, O: Default + ToJson + Clone
+    where T: DataType,
+          O: Default + ToJson + Clone
 {
     fn from(t: Term) -> WithOpts<T, O> {
         WithOpts(t.into(), Default::default())
@@ -435,43 +436,40 @@ key_from_st!{ i64 }
 key_from_st!{ u64 }
 
 impl Command {
-    pub fn new(cmd_type: TermType, prev_cmd: Option<Term>) -> Command
-        {
-            let mut term = Term::new();
-            term.set_field_type(cmd_type);
-            if let Some(cmd) = prev_cmd {
-                let args = RepeatedField::from_vec(vec![cmd]);
-                term.set_args(args);
-            }
-            Command(term)
+    pub fn new(cmd_type: TermType, prev_cmd: Option<Term>) -> Command {
+        let mut term = Term::new();
+        term.set_field_type(cmd_type);
+        if let Some(cmd) = prev_cmd {
+            let args = RepeatedField::from_vec(vec![cmd]);
+            term.set_args(args);
         }
+        Command(term)
+    }
 
-    pub fn with_args(&mut self, args: Term) -> &mut Self
-        {
-            self.0.mut_args().push(args);
-            self
-        }
+    pub fn with_args(&mut self, args: Term) -> &mut Self {
+        self.0.mut_args().push(args);
+        self
+    }
 
-    pub fn with_opts(&mut self, opts: Object) -> &mut Self
-        {
-            let mut opts: Term = opts.into();
-            if opts.has_datum() {
-                let mut datum = opts.take_datum();
-                let pairs = datum.take_r_object().into_vec();
-                for mut pair in pairs {
-                    if pair.has_key() {
-                        let mut term_pair = TermPair::new();
-                        term_pair.set_key(pair.take_key());
-                        let mut val = Term::new();
-                        val.set_field_type(TermType::DATUM);
-                        val.set_datum(pair.take_val());
-                        term_pair.set_val(val);
-                        self.0.mut_optargs().push(term_pair);
-                    }
+    pub fn with_opts(&mut self, opts: Object) -> &mut Self {
+        let mut opts: Term = opts.into();
+        if opts.has_datum() {
+            let mut datum = opts.take_datum();
+            let pairs = datum.take_r_object().into_vec();
+            for mut pair in pairs {
+                if pair.has_key() {
+                    let mut term_pair = TermPair::new();
+                    term_pair.set_key(pair.take_key());
+                    let mut val = Term::new();
+                    val.set_field_type(TermType::DATUM);
+                    val.set_datum(pair.take_val());
+                    term_pair.set_val(val);
+                    self.0.mut_optargs().push(term_pair);
                 }
             }
-            self
         }
+        self
+    }
 
     pub fn into<O>(self) -> O
         where O: From<Term>
@@ -488,23 +486,23 @@ impl Term {
             Value::String(val) => {
                 datum.set_field_type(DatumType::R_STR);
                 datum.set_r_str(val);
-            },
+            }
             Value::Bool(val) => {
                 datum.set_field_type(DatumType::R_BOOL);
                 datum.set_r_bool(val);
-            },
+            }
             Value::I64(val) => {
                 datum.set_field_type(DatumType::R_NUM);
                 datum.set_r_num(val as f64);
-            },
+            }
             Value::U64(val) => {
                 datum.set_field_type(DatumType::R_NUM);
                 datum.set_r_num(val as f64);
-            },
+            }
             Value::F64(val) => {
                 datum.set_field_type(DatumType::R_NUM);
                 datum.set_r_num(val);
-            },
+            }
             Value::Array(val) => {
                 datum.set_field_type(DatumType::R_ARRAY);
                 let args: Vec<Datum> = val.iter()
@@ -512,7 +510,7 @@ impl Term {
                     .collect();
                 let arr = RepeatedField::from_vec(args);
                 datum.set_r_array(arr);
-            },
+            }
             Value::Object(val) => {
                 datum.set_field_type(DatumType::R_OBJECT);
                 let args: Vec<DatumPair> = val.into_iter()
@@ -525,10 +523,10 @@ impl Term {
                     .collect();
                 let obj = RepeatedField::from_vec(args);
                 datum.set_r_object(obj);
-            },
+            }
             Value::Null => {
                 datum.set_field_type(DatumType::R_NULL);
-            },
+            }
         }
         // Term
         let mut term = Term::new();

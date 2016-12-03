@@ -6,16 +6,11 @@ use serde_json::value::ToJson;
 
 #[allow(dead_code)]
 impl<O> Command<types::Number, O>
-where O: ToJson + Clone
+    where O: ToJson + Clone
 {
-    pub fn rem<T>(&self, arg: T) -> Command<types::Number, ()> where
-        T: Into<types::Number>
-        {
-            Cmd::make(
-                TermType::MOD,
-                Some(vec![arg.into()]),
-                None,
-                Some(self),
-                )
-        }
+    pub fn rem<T>(&self, arg: T) -> Command<types::Number, ()>
+        where T: Into<types::Number>
+    {
+        Cmd::make(TermType::MOD, Some(vec![arg.into()]), None, Some(self))
+    }
 }

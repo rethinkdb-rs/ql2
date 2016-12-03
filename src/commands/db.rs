@@ -5,7 +5,7 @@
 //! > r.db(dbName) → db
 //!
 //! ## Description
-//! 
+//!
 //! Reference a database.
 //!
 //! The `db` command is optional. If it is not present in a query, the query will run against the
@@ -33,9 +33,9 @@ use super::Command;
 
 impl Command<(), ()> {
     /// Reference a database. [Read more](db/index.html)
-    pub fn db<T>(&self, arg: T) -> Command<types::Db, ()> where
-        T: Into<types::String>
-        {
-            Cmd::make(TermType::DB, Some(vec![arg.into()]), None, Root!())
-        }
+    pub fn db<T>(&self, arg: T) -> Command<types::Db, ()>
+        where T: Into<types::String>
+    {
+        Cmd::make(TermType::DB, Some(vec![arg.into()]), None, Root!())
+    }
 }

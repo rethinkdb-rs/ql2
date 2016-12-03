@@ -16,10 +16,7 @@ use types;
 
 use serde_json::value::{ToJson, Value};
 
-use proto::{
-    Term,
-    Term_TermType as TermType,
-};
+use proto::{Term, Term_TermType as TermType};
 
 use types::Command as Cmd;
 
@@ -34,11 +31,11 @@ pub const r: Client = Command((), None);
 impl RootCommand for Client {}
 
 pub trait RootCommand {
-    fn table<T>(&self, arg: T) -> Command<types::Table, TableOpts> where
-        T: Into<types::String>
-        {
-            r.db("test").table(arg)
-        }
+    fn table<T>(&self, arg: T) -> Command<types::Table, TableOpts>
+        where T: Into<types::String>
+    {
+        r.db("test").table(arg)
+    }
 }
 
 #[derive(Debug)]
@@ -47,35 +44,38 @@ pub struct Command<T, O>(T, Option<O>);
 pub type Client = Command<(), ()>;
 
 impl Cmd {
-    pub fn make<A, T, O, PT, PO>(typ: TermType, args: Option<Vec<A>>, opts: Option<O>, cmd: Option<&Command<PT, PO>>) -> Command<T, O>
-        where
-        A: types::DataType,
-        T: types::DataType,
-        O: ToJson + Clone,
-        PT: types::DataType,
-        PO: ToJson + Clone
-        {
-            let (prev_cmd, prev_opts) = match cmd {
-                Some(cmd) => (Some(cmd.0.clone().into()), cmd.1.clone()),
-                None => (None, None),
-            };
-            let mut dt = Cmd::new(typ, prev_cmd);
-            if let Some(args) = args {
-                for arg in args {
-                    dt.with_args(arg.into());
-                }
+    pub fn make<A, T, O, PT, PO>(typ: TermType,
+                                 args: Option<Vec<A>>,
+                                 opts: Option<O>,
+                                 cmd: Option<&Command<PT, PO>>)
+                                 -> Command<T, O>
+        where A: types::DataType,
+              T: types::DataType,
+              O: ToJson + Clone,
+              PT: types::DataType,
+              PO: ToJson + Clone
+    {
+        let (prev_cmd, prev_opts) = match cmd {
+            Some(cmd) => (Some(cmd.0.clone().into()), cmd.1.clone()),
+            None => (None, None),
+        };
+        let mut dt = Cmd::new(typ, prev_cmd);
+        if let Some(args) = args {
+            for arg in args {
+                dt.with_args(arg.into());
             }
-            if let Some(opt) = prev_opts {
-                let obj = types::Object::from(opt);
-                dt.with_opts(obj);
-            }
-            Command(dt.into(), opts)
         }
+        if let Some(opt) = prev_opts {
+            let obj = types::Object::from(opt);
+            dt.with_opts(obj);
+        }
+        Command(dt.into(), opts)
+    }
 }
 
-impl<T, O> From<Command<T, O>> for Term where
-T: types::DataType,
-O: ToJson + Clone
+impl<T, O> From<Command<T, O>> for Term
+    where T: types::DataType,
+          O: ToJson + Clone
 {
     fn from(t: Command<T, O>) -> Term {
         let term: Term = t.0.into();

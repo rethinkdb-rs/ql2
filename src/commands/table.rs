@@ -62,18 +62,20 @@ use super::{Command, TableOpts, ReadMode, IdentifierFormat};
 use serde_json::value::ToJson;
 
 impl<O> Command<types::Db, O>
-where O: ToJson + Clone
+    where O: ToJson + Clone
 {
     /// Return all documents in a table. [Read more](table/index.html)
-    pub fn table<T>(&self, arg: T) -> Command<types::Table, TableOpts> where
-        T: Into<types::String>
-        {
-            Cmd::make(TermType::TABLE, Some(vec![arg.into()]), Some(TableOpts::default()), Some(self))
-        }
+    pub fn table<T>(&self, arg: T) -> Command<types::Table, TableOpts>
+        where T: Into<types::String>
+    {
+        Cmd::make(TermType::TABLE,
+                  Some(vec![arg.into()]),
+                  Some(TableOpts::default()),
+                  Some(self))
+    }
 }
 
-impl<T> Command<T, TableOpts>
-{
+impl<T> Command<T, TableOpts> {
     /// Sets read mode
     pub fn read_mode(mut self, arg: ReadMode) -> Self {
         if let Some(ref mut opts) = self.1 {
