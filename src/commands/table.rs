@@ -68,7 +68,7 @@ where O: ToJson + Clone
     pub fn table<T>(&self, arg: T) -> Command<types::Table, TableOpts> where
         T: Into<types::String>
         {
-            Cmd::make(TermType::TABLE, Some(arg.into()), Some(TableOpts::default()), Some(self))
+            Cmd::make(TermType::TABLE, Some(vec![arg.into()]), Some(TableOpts::default()), Some(self))
         }
 }
 

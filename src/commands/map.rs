@@ -13,9 +13,9 @@ impl<O> Command<types::Table, O> where
 O: ToJson + Clone
 {
     pub fn map<T>(&self, arg: T) -> Command<types::Stream, ()> where
-        T: Into<MapArg>,
+        T: Into<MapArg<types::Stream>>,
     {
-        let arg: types::Stream = arg.into().into();
+        let arg: Vec<types::Stream> = arg.into().into();
         Cmd::make(TermType::MAP, Some(arg), None, Some(self))
     }
 }
@@ -24,9 +24,9 @@ impl<O> Command<types::Stream, O> where
 O: ToJson + Clone
 {
     pub fn map<T>(&self, arg: T) -> Command<types::Stream, ()> where
-        T: Into<MapArg>,
+        T: Into<MapArg<types::Stream>>,
     {
-        let arg: types::Stream = arg.into().into();
+        let arg: Vec<types::Stream> = arg.into().into();
         Cmd::make(TermType::MAP, Some(arg), None, Some(self))
     }
 }
@@ -37,40 +37,45 @@ O: ToJson + Clone
     pub fn map<T>(&self, arg: T) -> Command<types::Array, ()> where
         T: Into<types::Array>,
     {
-        Cmd::make(TermType::MAP, Some(arg.into()), None, Some(self))
+        Cmd::make(TermType::MAP, Some(vec![arg.into()]), None, Some(self))
     }
 }
 
-pub struct MapArg(Term);
+pub struct MapArg<T>(Vec<T>);
 
-impl From<MapArg> for types::Stream {
-    fn from(t: MapArg) -> types::Stream {
-        From::from(t.0)
+impl From<MapArg<types::Stream>> for Vec<types::Stream> {
+    fn from(t: MapArg<types::Stream>) -> Vec<types::Stream> {
+        t.0
     }
 }
 
-impl<F, T, O> From<F> for MapArg where
+impl<F, T, O> From<F> for MapArg<types::Stream> where
 T: types::DataType,
 O: ToJson + Clone,
 F: Fn(Arg) -> Command<T, O>
 {
-    fn from(t: F) -> MapArg {
+    fn from(t: F) -> MapArg<types::Stream> {
         let res = t(var!());
         let term = func!(res.into());
-        MapArg(term)
+        MapArg(vec![term.into()])
     }
 }
 
-impl<F, CT, CO, T, O> From<(Command<CT, CO>, F)> for MapArg where
-CT: types::DataType,
+pub trait Stream : types::DataType {}
+
+impl Stream for types::Table {}
+
+impl<F, CT, CO, T, O> From<(Command<CT, CO>, F)> for MapArg<types::Stream> where
+CT: Stream,
 CO: ToJson + Clone,
 T: types::DataType,
 O: ToJson + Clone,
 F: Fn(Arg, Arg) -> Command<T, O>
 {
-    fn from(t: (Command<CT, CO>, F)) -> MapArg {
+    fn from(t: (Command<CT, CO>, F)) -> MapArg<types::Stream> {
+        let arg: Term = t.0.into();
         let res = t.1(var!(), var!());
         let term = func!(res.into());
-        MapArg(term)
+        MapArg(vec![arg.into(), term.into()])
     }
 }

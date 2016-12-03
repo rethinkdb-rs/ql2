@@ -12,7 +12,7 @@ where O: ToJson + Clone
         T: Into<types::SecondaryKey>,
         GetAllOpts: Default + ToJson + Clone
         {
-            Cmd::make(TermType::GET_ALL, Some(arg.into()), Some(GetAllOpts::default()), Some(self))
+            Cmd::make(TermType::GET_ALL, Some(vec![arg.into()]), Some(GetAllOpts::default()), Some(self))
         }
 }
 

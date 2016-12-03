@@ -47,7 +47,7 @@ pub struct Command<T, O>(T, Option<O>);
 pub type Client = Command<(), ()>;
 
 impl Cmd {
-    pub fn make<A, T, O, PT, PO>(typ: TermType, arg: Option<A>, opts: Option<O>, cmd: Option<&Command<PT, PO>>) -> Command<T, O>
+    pub fn make<A, T, O, PT, PO>(typ: TermType, args: Option<Vec<A>>, opts: Option<O>, cmd: Option<&Command<PT, PO>>) -> Command<T, O>
         where
         A: types::DataType,
         T: types::DataType,
@@ -60,8 +60,10 @@ impl Cmd {
                 None => (None, None),
             };
             let mut dt = Cmd::new(typ, prev_cmd);
-            if let Some(arg) = arg {
-                dt.with_args(arg.into());
+            if let Some(args) = args {
+                for arg in args {
+                    dt.with_args(arg.into());
+                }
             }
             if let Some(opt) = prev_opts {
                 let obj = types::Object::from(opt);

@@ -36,6 +36,6 @@ impl Command<(), ()> {
     pub fn db<T>(&self, arg: T) -> Command<types::Db, ()> where
         T: Into<types::String>
         {
-            Cmd::make(TermType::DB, Some(arg.into()), None, Root!())
+            Cmd::make(TermType::DB, Some(vec![arg.into()]), None, Root!())
         }
 }

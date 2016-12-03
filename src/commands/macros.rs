@@ -3,7 +3,7 @@ macro_rules! Root {
 }
 
 macro_rules! NoArg {
-    () => {None as Option<types::Null>}
+    () => {None as Option<Vec<types::Null>>}
 }
 
 macro_rules! var {

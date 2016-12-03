@@ -13,7 +13,7 @@ O: ToJson + Clone
     {
         Cmd::make(
             TermType::GET,
-            Some(arg.into()),
+            Some(vec![arg.into()]),
             None,
             Some(self),
             )

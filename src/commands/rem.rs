@@ -13,7 +13,7 @@ where O: ToJson + Clone
         {
             Cmd::make(
                 TermType::MOD,
-                Some(arg.into()),
+                Some(vec![arg.into()]),
                 None,
                 Some(self),
                 )

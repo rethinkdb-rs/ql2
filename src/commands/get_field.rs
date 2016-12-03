@@ -11,7 +11,7 @@ where O: ToJson + Clone
     pub fn get_field<T, V>(&self, arg: T) -> Command<V, ()>
         where T: Into<types::String>, V: types::DataType
         {
-            Cmd::make(TermType::GET_FIELD, Some(arg.into()), None, Some(self))
+            Cmd::make(TermType::GET_FIELD, Some(vec![arg.into()]), None, Some(self))
         }
 }
 
@@ -22,6 +22,6 @@ where O: ToJson + Clone
     pub fn get_field<T>(&self, arg: T) -> Command<types::Array, ()>
         where T: Into<types::String>
         {
-            Cmd::make(TermType::GET_FIELD, Some(arg.into()), None, Some(self))
+            Cmd::make(TermType::GET_FIELD, Some(vec![arg.into()]), None, Some(self))
         }
 }
