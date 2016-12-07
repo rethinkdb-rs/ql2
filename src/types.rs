@@ -296,45 +296,6 @@ implement! {
     pub struct SecondaryKey
 }
 
-#[derive(Debug, Clone)]
-pub struct WithOpts<T, O>(T, O);
-
-impl<T, O> DataType for WithOpts<T, O>
-    where T: DataType,
-          O: Default + ToJson + Clone
-{
-}
-
-impl<T, O> WithOpts<T, O>
-    where T: DataType,
-          O: Default + ToJson + Clone
-{
-    pub fn new(cmd: T, opts: O) -> WithOpts<T, O> {
-        WithOpts(cmd, opts)
-    }
-}
-
-impl<T, O> From<WithOpts<T, O>> for Term
-    where T: DataType,
-          O: Default + ToJson + Clone
-{
-    fn from(t: WithOpts<T, O>) -> Term {
-        let obj = Object::from(t.1);
-        let mut cmd = Command(t.0.into());
-        cmd.with_opts(obj);
-        cmd.into()
-    }
-}
-
-impl<T, O> From<Term> for WithOpts<T, O>
-    where T: DataType,
-          O: Default + ToJson + Clone
-{
-    fn from(t: Term) -> WithOpts<T, O> {
-        WithOpts(t.into(), Default::default())
-    }
-}
-
 impl<T> From<T> for Object
     where T: ToJson
 {
