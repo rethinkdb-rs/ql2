@@ -62,31 +62,33 @@ pub trait Stream: types::DataType {}
 
 impl Stream for types::Table {}
 
-impl<F, T, O> From<F> for types::Function
-    where T: types::DataType,
+impl<F, CT, CO, T, O> From<(Command<CT, CO>, F)> for MapArg<types::Stream>
+    where CT: Stream,
+          CO: ToJson + Clone,
+          T: types::DataType,
           O: ToJson + Clone,
-          F: Fn(Arg, Arg) -> Command<T, O>,
+          F: Fn(Arg, Arg) -> Command<T, O>
 {
-    fn from(t: F) -> types::Function {
-        let res = t(var!(), var!());
-        let term = func!(res.into());
-        From::from(term)
+    fn from(t: (Command<CT, CO>, F)) -> MapArg<types::Stream> {
+        let arg: Term = t.0.into();
+        let res = t.1(var!(), var!());
+        let func = func!(res.into());
+        MapArg(vec![arg.into(), func.into()])
     }
 }
 
-impl<F, CT, CO> From<(Vec<Command<CT, CO>>, F)> for MapArg<types::Stream>
+impl<F, CT, CO, T, O> From<(Command<CT, CO>, Command<CT, CO>, F)> for MapArg<types::Stream>
     where CT: Stream,
           CO: ToJson + Clone,
-          F: Into<types::Function>
+          T: types::DataType,
+          O: ToJson + Clone,
+          F: Fn(Arg, Arg, Arg) -> Command<T, O>
 {
-    fn from(t: (Vec<Command<CT, CO>>, F)) -> MapArg<types::Stream> {
-        let mut args = Vec::with_capacity(t.0.len()+1);
-        for arg in t.0 {
-            let arg: Term = arg.into();
-            args.push(arg.into());
-        }
-        let func: Term = t.1.into().into();
-        args.push(func.into());
-        MapArg(args)
+    fn from(t: (Command<CT, CO>, Command<CT, CO>, F)) -> MapArg<types::Stream> {
+        let arg0: Term = t.0.into();
+        let arg1: Term = t.1.into();
+        let res = t.2(var!(), var!(), var!());
+        let func = func!(res.into());
+        MapArg(vec![arg0.into(), arg1.into(), func.into()])
     }
 }

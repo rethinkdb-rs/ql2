@@ -8,11 +8,10 @@ use ql2::commands::IdentifierFormat::Uuid;
 */
 #[test]
 fn db_works() {
-    let villains = r.table("villains");
-    let query = r.table("heroes").map((vec![villains], |hero: Arg, villain: Arg| {
+    let query = r.table("heroes").map(|hero: Arg| {
             //(row as Command<types::Object, ()>).get_field::<_, types::Object>("villain")
             hero.get_field::<_, types::Object>("villain")
-        }))
+        })
         ;
     /*
         */
