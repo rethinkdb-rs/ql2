@@ -9,6 +9,17 @@ readme = "README.md"
 keywords = ["database", "rethinkdb", "reql", "ql2"]
 authors = ["rushmorem <rushmore@webenchanter.com>"]
 
+build = "build.rs"
+
 [dependencies]
 protobuf = "1.0"
+serde = "0.8"
 serde_json = "0.8"
+scram = "0.1"
+r2d2 = "0.7"
+quick-error = "1.1"
+byteorder = "0.5"
+bufstream = "0.1"
+
+[build-dependencies]
+serde_codegen = "0.8"
