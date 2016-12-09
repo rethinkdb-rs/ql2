@@ -2,6 +2,7 @@
 
 use std::io;
 use std::str;
+use std::sync::mpsc::SendError;
 use r2d2::{InitializationError, GetTimeout};
 use serde_json::error as json;
 use protobuf::ProtobufError;
@@ -72,7 +73,6 @@ quick_error! {
         Auth(descr: String)
         Connection(err: ConnectionError) { from() }
         Response(err: ResponseError) { from() }
-        Lock(err: String)
         Json(err: json::Error) { from() }
         Protobuf(err: ProtobufError) { from() }
         Scram(err: ScramError) { from() }
@@ -161,5 +161,12 @@ impl From<ProtobufError> for Error {
 impl From<ScramError> for Error {
     fn from(err: ScramError) -> Error {
         From::from(DriverError::Scram(err))
+    }
+}
+
+impl<T> From<SendError<T>> for Error {
+    fn from(err: SendError<T>) -> Error {
+        let msg = format!("{:?}", err);
+        From::from(DriverError::Other(msg))
     }
 }

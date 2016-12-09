@@ -1,7 +1,7 @@
 use std::net::TcpStream;
 use std::str;
 use std::io::{Write, BufRead, Read};
-use std::sync::mpsc::{self, SyncSender};
+use std::sync::mpsc::SyncSender;
 use std::fmt::Debug;
 
 use errors::*;
@@ -25,8 +25,6 @@ use proto::{
 
 include!(concat!(env!("OUT_DIR"), "/conn.rs"));
 include!(concat!(env!("OUT_DIR"), "/query.rs"));
-
-const CHANNEL_SIZE: usize = 1024 * 1024;
 
 macro_rules! error {
     ($e:expr) => {{
@@ -247,25 +245,57 @@ pub trait Pool {
     fn get(&self) -> Result<Connection>;
 }
 
-pub fn send<T, P>(pool: P, cfg: &ConnectionOpts, commands: String, opts: Option<String>, mut tx: SyncSender<Result<ResponseValue<T>>>) -> Result<()>
-where T: 'static + Deserialize + Send + Debug,
-        P: Pool,
+pub struct Request<T: Deserialize, P: Pool> {
+    pool: P,
+    conn: Connection,
+    retry: bool,
+    write: bool,
+    tx: SyncSender<Result<ResponseValue<T>>>,
+}
+
+impl<T, P> Request<T, P>
+    where P: Pool,
+          T: 'static + Deserialize + Send + Debug,
 {
-    let mut query = wrap_query(QueryType::START, Some(commands), opts);
-    let mut conn = pool.get()?;
-    println!("{}", query);
-    // Try sending the query
+    pub fn new(pool: P, tx: SyncSender<Result<ResponseValue<T>>>) -> Result<Request<T, P>>
     {
-        let mut i = 0;
-        let mut write = true;
-        let mut connect = false;
-        while i < cfg.retries {
-            // Open a new connection if necessary
-            if connect {
-                drop(&mut conn);
-                conn = match pool.get() {
-                    Ok(c) => c,
-                    Err(error) => {
+        let conn = pool.get()?;
+        Ok(Request{
+            pool: pool,
+            conn: conn,
+            retry: false,
+            write: true,
+            tx: tx,
+        })
+    }
+
+    pub fn submit(&mut self, cfg: &ConnectionOpts, commands: String, opts: Option<String>) -> Result<()>
+    {
+        let mut query = wrap_query(QueryType::START, Some(commands), opts);
+        // Try sending the query
+        {
+            let mut i = 0;
+            let mut connect = false;
+            while i < cfg.retries {
+                // Open a new connection if necessary
+                if connect {
+                    drop(&mut self.conn);
+                    self.conn = match self.pool.get() {
+                        Ok(c) => c,
+                        Err(error) => {
+                            if i == cfg.retries - 1 {
+                                return error!(error);
+                            } else {
+                                i += 1;
+                                continue;
+                            }
+                        }
+                    };
+                }
+                // Submit the query if necessary
+                if self.write {
+                    if let Err(error) = self.write(&query) {
+                        connect = true;
                         if i == cfg.retries - 1 {
                             return error!(error);
                         } else {
@@ -273,217 +303,194 @@ where T: 'static + Deserialize + Send + Debug,
                             continue;
                         }
                     }
-                };
-            }
-            // Submit the query if necessary
-            if write {
-                if let Err(error) = write_query(&query, &mut conn) {
-                    connect = true;
-                    if i == cfg.retries - 1 {
+                    connect = false;
+                }
+                // Handle the response
+                if let Err(error) = self.process(&mut query) {
+                    if i == cfg.retries - 1 || !self.retry {
                         return error!(error);
-                    } else {
-                        i += 1;
-                        continue;
+                    }
+                    i += 1;
+                    continue;
+                }
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn process(&mut self, query: &mut String) -> Result<()>
+    {
+        self.retry = false;
+        self.write = false;
+        match self.handle() {
+            Ok(t) => {
+                match t {
+                    Some(ResponseType::SUCCESS_PARTIAL) => {
+                        *query = wrap_query(QueryType::CONTINUE, None, None);
+                        if let Err(error) = self.write(query) {
+                            self.write = true;
+                            self.retry = true;
+                            return error!(error);
+                        }
+                        self.process(query)?;
+                    },
+
+                    Some(_)  => {/* we are done */},
+
+                    None => {
+                        let msg = String::from("Request::handle() unexpectedly returned None");
+                        return error!(DriverError::Other(msg));
+                    },
+                }
+            }
+            Err(error) => {
+                if let Error::Runtime(RuntimeError::Availability(AvailabilityError::OpFailed(ref msg))) = error {
+                    if msg.starts_with("Cannot perform write: primary replica for shard") {
+                        self.write = true;
+                        self.retry = true;
                     }
                 }
-                connect = false;
+                return error!(error);
             }
-            // Handle the response
-            let (new_tx, tx_returned, write_opt, retry, res) = process_response::<T>(&mut query, &mut conn, tx);
-            tx = new_tx;
-            if let Err(error) = res {
-                    write = write_opt;
-                    if i == cfg.retries - 1 || !retry {
-                        return error!(error);
-                    }
-                    if !tx_returned {
-                        return error!(error);
-                    } else {
-                        i += 1;
-                        continue;
-                    }
-            }
-            break;
         }
+        Ok(())
     }
-    Ok(())
-}
 
-fn process_response<T>(query: &mut String, conn: &mut Connection, mut tx: SyncSender<Result<ResponseValue<T>>>) -> (SyncSender<Result<ResponseValue<T>>>, bool, bool, bool, Result<()>)
-    where T: 'static + Deserialize + Send + Debug
-{
-    let mut write = false;
-    let mut retry = false;
-    let (new_tx, tx_returned, new_retry, res) = handle_response::<T>(conn, tx);
-    tx = new_tx;
-    macro_rules! return_error {
-        ($e:expr) => {{
-            return (tx, tx_returned, write, retry, error!($e));
-        }}
-    }
-    macro_rules! try {
-        ($e:expr) => {{
-            match $e {
-                Ok(v) => v,
-                Err(error) => return_error!(error),
-            }
-        }}
-    }
-    match res {
-        Ok(t) => {
-            match t {
-                ResponseType::SUCCESS_ATOM | ResponseType::SUCCESS_SEQUENCE | ResponseType::WAIT_COMPLETE | ResponseType::SERVER_INFO | ResponseType::CLIENT_ERROR | ResponseType::COMPILE_ERROR | ResponseType::RUNTIME_ERROR  => {/* we are done */},
-                ResponseType::SUCCESS_PARTIAL => {
-                    *query = wrap_query(QueryType::CONTINUE, None, None);
-                    if let Err(error) = write_query(query, conn) {
-                        write = true;
-                        retry = true;
-                        return_error!(error);
-                    }
-                    let (new_tx, _, _, new_retry, res) = process_response::<T>(query, conn, tx);
-                    tx = new_tx;
-                    retry = new_retry;
-                    if let Err(error) = res {
-                        return_error!(error);
-                    }
-                },
-            }
-        }
-        Err(error) => {
-            retry = new_retry;
-            match error {
-                Error::Runtime(error) => {
-                    match error {
-                        RuntimeError::Availability(error) => {
-                            match error {
-                                AvailabilityError::OpFailed(msg) => {
-                                    if msg.starts_with("Cannot perform write: primary replica for shard") {
-                                        write = true;
-                                        retry = true;
-                                    }
-                                    return_error!(AvailabilityError::OpFailed(msg));
-                                }
-                                error => return_error!(error),
+    pub fn handle(&mut self) -> Result<Option<ResponseType>>
+    {
+        self.retry = false;
+        match self.read() {
+            Ok(resp) => {
+                let result: ReqlResponse = from_slice(&resp[..])?;
+                let respt: ResponseType;
+                if let Some(t) = ResponseType::from_i32(result.t) {
+                    respt = t;
+                } else {
+                    let msg = format!("Unsupported response type ({}), returned by the database.", result.t);
+                    return error!(DriverError::Other(msg));
+                }
+                // If the database says this response is an error convert the error 
+                // message to our native one.
+                let has_generic_error = match respt {
+                    ResponseType::CLIENT_ERROR | ResponseType::COMPILE_ERROR | ResponseType::RUNTIME_ERROR => true,
+                    _ => false,
+                };
+                let mut msg = String::new();
+                if result.e.is_some() || has_generic_error {
+                    msg = if let Value::Array(error) = result.r.clone() {
+                        if error.len() == 1 {
+                            if let Some(Value::String(msg)) = error.into_iter().next() {
+                                msg
+                            } else {
+                                return error!(ResponseError::Db(result.r));
                             }
-                        }
-                        error => return_error!(error),
-                    }
-                }
-                error => return_error!(error),
-            }
-        }
-    }
-    (tx, tx_returned, write, retry, Ok(()))
-}
-
-fn handle_response<T>(conn: &mut Connection, mut tx: SyncSender<Result<ResponseValue<T>>>) -> (SyncSender<Result<ResponseValue<T>>>, bool, bool, Result<ResponseType>)
-    where T: 'static + Deserialize + Send + Debug
-{
-    let (new_tx, _) = mpsc::sync_channel(CHANNEL_SIZE);
-    let mut retry = false;
-    macro_rules! return_error {
-        ($e:expr) => {{
-            return (tx, true, retry, error!($e));
-        }}
-    }
-    macro_rules! try {
-        ($e:expr) => {{
-            match $e {
-                Ok(v) => v,
-                Err(error) => return_error!(error),
-            }
-        }}
-    }
-    macro_rules! try_tx {
-        ($e:expr) => {{
-            match $e {
-                Ok(v) => v,
-                Err(error) => return (new_tx, false, retry, error!($e)),
-            }
-        }}
-    }
-    match read_query(conn) {
-        Ok(resp) => {
-            let result: ReqlResponse = try!(from_slice(&resp[..]));
-            let respt: ResponseType;
-            if let Some(t) = ResponseType::from_i32(result.t) {
-                respt = t;
-            } else {
-                let msg = format!("Unsupported response type ({}), returned by the database.", result.t);
-                return_error!(DriverError::Other(msg));
-            }
-            // If the database says this response is an error convert the error 
-            // message to our native one.
-            let has_generic_error = match respt {
-                ResponseType::CLIENT_ERROR | ResponseType::COMPILE_ERROR | ResponseType::RUNTIME_ERROR => true,
-                _ => false,
-            };
-            let mut msg = String::new();
-            if result.e.is_some() || has_generic_error {
-                msg = if let Value::Array(error) = result.r.clone() {
-                    if error.len() == 1 {
-                        if let Some(Value::String(msg)) = error.into_iter().next() {
-                            msg
                         } else {
-                            return_error!(ResponseError::Db(result.r));
+                            return error!(ResponseError::Db(result.r));
                         }
                     } else {
-                        return_error!(ResponseError::Db(result.r));
+                        return error!(ResponseError::Db(result.r));
+                    };
+                }
+                if let Some(e) = result.e {
+                    if let Some(error) = ErrorType::from_i32(e) {
+                        match error {
+                            ErrorType::INTERNAL => return error!(RuntimeError::Internal(msg)),
+                            ErrorType::RESOURCE_LIMIT => return error!(RuntimeError::ResourceLimit(msg)),
+                            ErrorType::QUERY_LOGIC => return error!(RuntimeError::QueryLogic(msg)),
+                            ErrorType::NON_EXISTENCE => return error!(RuntimeError::NonExistence(msg)),
+                            ErrorType::OP_FAILED => return error!(AvailabilityError::OpFailed(msg)),
+                            ErrorType::OP_INDETERMINATE => return error!(AvailabilityError::OpIndeterminate(msg)),
+                            ErrorType::USER => return error!(RuntimeError::User(msg)),
+                            ErrorType::PERMISSION_ERROR => return error!(RuntimeError::Permission(msg)),
+                        }
+                    } else {
+                        return error!(ResponseError::Db(result.r));
+                    }
+                }
+                if has_generic_error {
+                    match respt {
+                        ResponseType::CLIENT_ERROR => return error!(DriverError::Other(msg)),
+                        ResponseType::COMPILE_ERROR => return error!(Error::Compile(msg)),
+                        ResponseType::RUNTIME_ERROR => return error!(ResponseError::Db(result.r)),
+                        _ => {/* not an error */},
+                    }
+                }
+                // Since this is a successful query let's process the results and send
+                // them to the caller
+                if let Ok(stati) = from_value::<Vec<WriteStatus>>(result.r.clone()) {
+                    for v in stati {
+                        let tx = self.tx.clone();
+                        tx.send(Ok(ResponseValue::Write(v)))?;
+                    }
+                } else if let Ok(data) = from_value::<Vec<T>>(result.r.clone()) {
+                    for v in data {
+                        let tx = self.tx.clone();
+                        tx.send(Ok(ResponseValue::Read(v)))?;
                     }
                 } else {
-                    return_error!(ResponseError::Db(result.r));
-                };
-            }
-            if let Some(e) = result.e {
-                if let Some(error) = ErrorType::from_i32(e) {
-                    match error {
-                        ErrorType::INTERNAL => return_error!(RuntimeError::Internal(msg)),
-                        ErrorType::RESOURCE_LIMIT => return_error!(RuntimeError::ResourceLimit(msg)),
-                        ErrorType::QUERY_LOGIC => return_error!(RuntimeError::QueryLogic(msg)),
-                        ErrorType::NON_EXISTENCE => return_error!(RuntimeError::NonExistence(msg)),
-                        ErrorType::OP_FAILED => return_error!(AvailabilityError::OpFailed(msg)),
-                        ErrorType::OP_INDETERMINATE => return_error!(AvailabilityError::OpIndeterminate(msg)),
-                        ErrorType::USER => return_error!(RuntimeError::User(msg)),
-                        ErrorType::PERMISSION_ERROR => return_error!(RuntimeError::Permission(msg)),
-                    }
-                } else {
-                    return_error!(ResponseError::Db(result.r));
+                    // Send unexpected query response
+                    // This is not an error according to the database
+                    // but the caller wasn't expecting such a response
+                    // so we just return it raw.
+                    let tx = self.tx.clone();
+                    tx.send(Ok(ResponseValue::Raw(result.r.clone())))?;
                 }
+                // Return response type so we know if we need to retrieve more data
+                Ok(Some(respt))
+            },
+            // We failed to read the server's response so we will
+            // try again as long as we haven't used up all our allowed retries.
+            Err(error) => {
+                self.retry = true;
+                return error!(error);
+            },
+        }
+    }
+
+    pub fn write(&mut self, query: &str) -> Result<()> {
+        let query = query.as_bytes();
+        let token = self.conn.token;
+        if let Err(error) = self.conn.stream.write_u64::<LittleEndian>(token) {
+            self.conn.broken = true;
+            return error!(error);
+        }
+        if let Err(error) = self.conn.stream.write_u32::<LittleEndian>(query.len() as u32) {
+            self.conn.broken = true;
+            return error!(error);
+        }
+        if let Err(error) = self.conn.stream.write_all(query) {
+            self.conn.broken = true;
+            return error!(error);
+        }
+        if let Err(error) = self.conn.stream.flush() {
+            self.conn.broken = true;
+            return error!(error);
+        }
+        Ok(())
+    }
+
+    pub fn read(&mut self) -> Result<Vec<u8>> {
+        let _ = match self.conn.stream.read_u64::<LittleEndian>() {
+            Ok(token) => token,
+            Err(error) => {
+                self.conn.broken = true;
+                return error!(error);
             }
-            if has_generic_error {
-                match respt {
-                    ResponseType::CLIENT_ERROR => return_error!(DriverError::Other(msg)),
-                    ResponseType::COMPILE_ERROR => return_error!(Error::Compile(msg)),
-                    ResponseType::RUNTIME_ERROR => return_error!(ResponseError::Db(result.r)),
-                    _ => {/* not an error */},
-                }
+        };
+        let len = match self.conn.stream.read_u32::<LittleEndian>() {
+            Ok(len) => len,
+            Err(error) => {
+                self.conn.broken = true;
+                return error!(error);
             }
-            // Since this is a successful query let's process the results and send
-            // them to the caller
-            if let Ok(stati) = from_value::<Vec<WriteStatus>>(result.r.clone()) {
-                for v in stati {
-                    tx = try_tx!(tx.send(Ok(ResponseValue::Write(v))));
-                }
-            } else if let Ok(data) = from_value::<Vec<T>>(result.r.clone()) {
-                for v in data {
-                    tx = try_tx!(tx.send(Ok(ResponseValue::Read(v))));
-                }
-            } else {
-                // Send unexpected query response
-                // This is not an error according to the database
-                // but the caller wasn't expecting such a response
-                // so we just return it raw.
-                tx = try_tx!(tx.send(Ok(ResponseValue::Raw(result.r.clone()))));
-            }
-            // Return response type so we know if we need to retrieve more data
-            (tx, true, retry, Ok(respt))
-        },
-        // We failed to read the server's response so we will
-        // try again as long as we haven't used up all our allowed retries.
-        Err(error) => {
-            retry = true;
-            return_error!(error);
-        },
+        };
+        let mut resp = vec![0u8; len as usize];
+        if let Err(error) = self.conn.stream.read_exact(&mut resp) {
+            self.conn.broken = true;
+            return error!(error);
+        }
+        Ok(resp)
     }
 }
 
@@ -500,49 +507,4 @@ fn wrap_query(query_type: QueryType,
     }
     qry.push_str("]");
     qry
-}
-
-fn write_query(query: &str, conn: &mut Connection) -> Result<()> {
-    let query = query.as_bytes();
-    let token = conn.token;
-    if let Err(error) = conn.stream.write_u64::<LittleEndian>(token) {
-        conn.broken = true;
-        return error!(error);
-    }
-    if let Err(error) = conn.stream.write_u32::<LittleEndian>(query.len() as u32) {
-        conn.broken = true;
-        return error!(error);
-    }
-    if let Err(error) = conn.stream.write_all(query) {
-        conn.broken = true;
-        return error!(error);
-    }
-    if let Err(error) = conn.stream.flush() {
-        conn.broken = true;
-        return error!(error);
-    }
-    Ok(())
-}
-
-fn read_query(conn: &mut Connection) -> Result<Vec<u8>> {
-    let _ = match conn.stream.read_u64::<LittleEndian>() {
-        Ok(token) => token,
-        Err(error) => {
-            conn.broken = true;
-            return error!(error);
-        }
-    };
-    let len = match conn.stream.read_u32::<LittleEndian>() {
-        Ok(len) => len,
-        Err(error) => {
-            conn.broken = true;
-            return error!(error);
-        }
-    };
-    let mut resp = vec![0u8; len as usize];
-    if let Err(error) = conn.stream.read_exact(&mut resp) {
-        conn.broken = true;
-        return error!(error);
-    }
-    Ok(resp)
 }
