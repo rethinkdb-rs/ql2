@@ -6,8 +6,12 @@ use std::path::Path;
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
 
-    let src = Path::new("src/serde/conn.in.rs");
-    let dst = Path::new(&out_dir).join("conn_types.rs");
+    for path in &["conn", "query"] {
+        let src = format!("src/serde/{}.in.rs", path);
+        let dst = format!("{}.rs", path);
 
-    serde_codegen::expand(&src, &dst).unwrap();
+        let src = Path::new(&src);
+        let dst = Path::new(&out_dir).join(&dst);
+        serde_codegen::expand(&src, &dst).unwrap();
+    }
 }

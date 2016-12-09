@@ -1,6 +1,7 @@
 //! RethinkDB protocol implementation in Rust
 
 extern crate protobuf;
+extern crate serde;
 extern crate serde_json;
 #[macro_use]
 extern crate quick_error;
@@ -8,6 +9,7 @@ extern crate r2d2;
 extern crate scram;
 extern crate byteorder;
 extern crate bufstream;
+extern crate uuid;
 
 pub mod conn;
 pub mod proto;
