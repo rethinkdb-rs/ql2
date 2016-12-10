@@ -51,12 +51,67 @@ pub struct ConnectionOpts {
     user: &'static str,
     password: &'static str,
     retries: u8,
-    ssl: Option<SslCfg>,
-    server: Option<&'static str>,
+    tls: Option<TlsCfg>,
+}
+
+impl ConnectionOpts {
+    pub fn servers(&self) -> &Vec<&'static str> {
+        &self.servers
+    }
+
+    pub fn set_servers(&mut self, servers: Vec<&'static str>) -> &mut Self {
+        self.servers = servers;
+        self
+    }
+
+    pub fn db(&self) -> &'static str {
+        self.db
+    }
+
+    pub fn set_db(&mut self, db: &'static str) -> &mut Self {
+        self.db = db;
+        self
+    }
+
+    pub fn user(&self) -> &'static str {
+        self.user
+    }
+
+    pub fn set_user(&mut self, user: &'static str) -> &mut Self {
+        self.user = user;
+        self
+    }
+
+    pub fn password(&self) -> &'static str {
+        self.password
+    }
+
+    pub fn set_password(&mut self, password: &'static str) -> &mut Self {
+        self.password = password;
+        self
+    }
+
+    pub fn retries(&self) -> u8 {
+        self.retries
+    }
+
+    pub fn set_retries(&mut self, retries: u8) -> &mut Self {
+        self.retries = retries;
+        self
+    }
+
+    pub fn tls(&self) -> &Option<TlsCfg> {
+        &self.tls
+    }
+
+    pub fn set_tls(&mut self, tls: Option<TlsCfg>) -> &mut Self {
+        self.tls = tls;
+        self
+    }
 }
 
 #[derive(Debug, Clone)]
-pub struct SslCfg {
+pub struct TlsCfg {
     ca_certs: &'static str,
 }
 
@@ -68,8 +123,7 @@ impl Default for ConnectionOpts {
             user: "admin",
             password: "",
             retries: 5,
-            ssl: None,
-            server: None,
+            tls: None,
         }
     }
 }
@@ -83,13 +137,7 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn new(opts: &ConnectionOpts) -> Result<Connection> {
-        let server = match opts.server {
-            Some(server) => server,
-            None => {
-                return error!(ConnectionError::Other(String::from("No server selected.")))
-            }
-        };
+    pub fn new(server: &'static str, opts: &ConnectionOpts) -> Result<Connection> {
         let mut conn = Connection {
             stream: try!(TcpStream::connect(server)),
             token: 0,
@@ -118,28 +166,6 @@ impl Connection {
         let _ = try!(self.stream.flush());
 
         Ok(())
-    }
-
-    pub fn stream(&mut self) -> &mut TcpStream {
-        &mut self.stream
-    }
-
-    pub fn set_token(&mut self, t: u64) -> &mut Self {
-        self.token = t;
-        self
-    }
-
-    pub fn token(&self) -> u64 {
-        self.token
-    }
-
-    pub fn set_boken(&mut self, b: bool) -> &mut Self {
-        self.broken = b;
-        self
-    }
-
-    pub fn broken(&self) -> bool {
-        self.broken
     }
 }
 
@@ -241,13 +267,48 @@ fn parse_server_final(scram: ServerFinal, stream: &TcpStream) -> Result<()> {
     Ok(())
 }
 
-pub trait Pool {
-    fn get(&self) -> Result<Connection>;
+impl ReqlConnection for Connection {
+    fn stream(&mut self) -> &mut TcpStream {
+        &mut self.stream
+    }
+
+    fn incr_token(&mut self) -> &mut Self {
+        self.token += 1;
+        self
+    }
+
+    fn token(&self) -> u64 {
+        self.token
+    }
+
+    fn set_broken(&mut self, b: bool) -> &mut Self {
+        self.broken = b;
+        self
+    }
+
+    fn broken(&self) -> bool {
+        self.broken
+    }
+}
+
+pub trait ReqlConnection {
+    fn stream(&mut self) -> &mut TcpStream;
+    fn incr_token(&mut self) -> &mut Self;
+    fn token(&self) -> u64;
+    fn set_broken(&mut self, b: bool) -> &mut Self;
+    fn broken(&self) -> bool;
+}
+
+pub trait Pool where Self::Connection: ReqlConnection
+{
+    type Connection;
+
+    fn get(&self) -> Result<Self::Connection>;
 }
 
 pub struct Request<T: Deserialize, P: Pool> {
     pool: P,
-    conn: Connection,
+    conn: P::Connection,
     retry: bool,
     write: bool,
     tx: SyncSender<Result<ResponseValue<T>>>,
@@ -255,6 +316,7 @@ pub struct Request<T: Deserialize, P: Pool> {
 
 impl<T, P> Request<T, P>
     where P: Pool,
+          P::Connection: ReqlConnection,
           T: 'static + Deserialize + Send + Debug,
 {
     pub fn new(pool: P, tx: SyncSender<Result<ResponseValue<T>>>) -> Result<Request<T, P>>
@@ -450,44 +512,44 @@ impl<T, P> Request<T, P>
 
     pub fn write(&mut self, query: &str) -> Result<()> {
         let query = query.as_bytes();
-        let token = self.conn.token;
-        if let Err(error) = self.conn.stream.write_u64::<LittleEndian>(token) {
-            self.conn.broken = true;
+        let token = self.conn.token();
+        if let Err(error) = self.conn.stream().write_u64::<LittleEndian>(token) {
+            self.conn.set_broken(true);
             return error!(error);
         }
-        if let Err(error) = self.conn.stream.write_u32::<LittleEndian>(query.len() as u32) {
-            self.conn.broken = true;
+        if let Err(error) = self.conn.stream().write_u32::<LittleEndian>(query.len() as u32) {
+            self.conn.set_broken(true);
             return error!(error);
         }
-        if let Err(error) = self.conn.stream.write_all(query) {
-            self.conn.broken = true;
+        if let Err(error) = self.conn.stream().write_all(query) {
+            self.conn.set_broken(true);
             return error!(error);
         }
-        if let Err(error) = self.conn.stream.flush() {
-            self.conn.broken = true;
+        if let Err(error) = self.conn.stream().flush() {
+            self.conn.set_broken(true);
             return error!(error);
         }
         Ok(())
     }
 
     pub fn read(&mut self) -> Result<Vec<u8>> {
-        let _ = match self.conn.stream.read_u64::<LittleEndian>() {
+        let _ = match self.conn.stream().read_u64::<LittleEndian>() {
             Ok(token) => token,
             Err(error) => {
-                self.conn.broken = true;
+                self.conn.set_broken(true);
                 return error!(error);
             }
         };
-        let len = match self.conn.stream.read_u32::<LittleEndian>() {
+        let len = match self.conn.stream().read_u32::<LittleEndian>() {
             Ok(len) => len,
             Err(error) => {
-                self.conn.broken = true;
+                self.conn.set_broken(true);
                 return error!(error);
             }
         };
         let mut resp = vec![0u8; len as usize];
-        if let Err(error) = self.conn.stream.read_exact(&mut resp) {
-            self.conn.broken = true;
+        if let Err(error) = self.conn.stream().read_exact(&mut resp) {
+            self.conn.set_broken(true);
             return error!(error);
         }
         Ok(resp)
