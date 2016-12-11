@@ -166,6 +166,24 @@ impl Connection {
 
         Ok(())
     }
+
+    pub fn is_valid(&mut self) -> Result<()> {
+        self.incr_token();
+        let query = wrap_query(QueryType::START, Some(String::from("1")), None);
+        write_query(self, &query)?;
+        let resp = read_query(self)?;
+        let resp: ReqlResponse = from_slice(&resp[..])?;
+        if let Some(respt) = ResponseType::from_i32(resp.t) {
+            if let ResponseType::SUCCESS_ATOM = respt {
+                let val: Vec<i32> = from_value(resp.r.clone())?;
+                if val == [1] {
+                    return Ok(());
+                }
+            }
+        }
+        let msg = format!("Unexpected response from server: {:?}", resp);
+        error!(ConnectionError::Other(msg))
+    }
 }
 
 fn parse_server_version(stream: &TcpStream) -> Result<()> {
@@ -516,52 +534,64 @@ impl<T, S> Request<T, S>
     }
 
     pub fn write(&mut self, query: &str) -> Result<()> {
-        let query = query.as_bytes();
-        let token = self.conn.token();
-        if let Err(error) = self.conn.stream().write_u64::<LittleEndian>(token) {
-            self.conn.set_broken(true);
-            return error!(error);
-        }
-        if let Err(error) = self.conn.stream().write_u32::<LittleEndian>(query.len() as u32) {
-            self.conn.set_broken(true);
-            return error!(error);
-        }
-        if let Err(error) = self.conn.stream().write_all(query) {
-            self.conn.set_broken(true);
-            return error!(error);
-        }
-        if let Err(error) = self.conn.stream().flush() {
-            self.conn.set_broken(true);
-            return error!(error);
-        }
-        Ok(())
+        write_query(&mut self.conn, query)
     }
 
     pub fn read(&mut self) -> Result<Vec<u8>> {
-        let _ = match self.conn.stream().read_u64::<LittleEndian>() {
-            Ok(token) => token,
-            Err(error) => {
-                self.conn.set_broken(true);
-                return error!(error);
-            }
-        };
-        let len = match self.conn.stream().read_u32::<LittleEndian>() {
-            Ok(len) => len,
-            Err(error) => {
-                self.conn.set_broken(true);
-                return error!(error);
-            }
-        };
-        let mut resp = vec![0u8; len as usize];
-        if let Err(error) = self.conn.stream().read_exact(&mut resp) {
-            self.conn.set_broken(true);
-            return error!(error);
-        }
-        Ok(resp)
+        read_query(&mut self.conn)
     }
 }
 
-fn wrap_query(query_type: QueryType,
+pub fn write_query<C>(conn: &mut C, query: &str) -> Result<()>
+    where C: ReqlConnection
+{
+    let query = query.as_bytes();
+    let token = conn.token();
+    if let Err(error) = conn.stream().write_u64::<LittleEndian>(token) {
+        conn.set_broken(true);
+        return error!(error);
+    }
+    if let Err(error) = conn.stream().write_u32::<LittleEndian>(query.len() as u32) {
+        conn.set_broken(true);
+        return error!(error);
+    }
+    if let Err(error) = conn.stream().write_all(query) {
+        conn.set_broken(true);
+        return error!(error);
+    }
+    if let Err(error) = conn.stream().flush() {
+        conn.set_broken(true);
+        return error!(error);
+    }
+    Ok(())
+}
+
+pub fn read_query<C>(conn: &mut C) -> Result<Vec<u8>>
+    where C: ReqlConnection
+{
+    let _ = match conn.stream().read_u64::<LittleEndian>() {
+        Ok(token) => token,
+        Err(error) => {
+            conn.set_broken(true);
+            return error!(error);
+        }
+    };
+    let len = match conn.stream().read_u32::<LittleEndian>() {
+        Ok(len) => len,
+        Err(error) => {
+            conn.set_broken(true);
+            return error!(error);
+        }
+    };
+    let mut resp = vec![0u8; len as usize];
+    if let Err(error) = conn.stream().read_exact(&mut resp) {
+        conn.set_broken(true);
+        return error!(error);
+    }
+    Ok(resp)
+}
+
+pub fn wrap_query(query_type: QueryType,
               query: Option<String>,
               options: Option<String>)
 -> String {
