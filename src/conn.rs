@@ -2,7 +2,6 @@ use std::net::TcpStream;
 use std::str;
 use std::io::{Write, BufRead, Read};
 use std::sync::mpsc::SyncSender;
-use std::fmt::Debug;
 
 use errors::*;
 use ::Result;
@@ -299,27 +298,27 @@ pub trait ReqlConnection {
     fn broken(&self) -> bool;
 }
 
-pub trait Pool where Self::Connection: ReqlConnection
+pub trait Session where Self::Connection: ReqlConnection
 {
     type Connection;
 
     fn get(&self) -> Result<Self::Connection>;
 }
 
-pub struct Request<T: Deserialize, P: Pool> {
-    pool: P,
-    conn: P::Connection,
+pub struct Request<T: Deserialize, S: Session> {
+    pool: S,
+    conn: S::Connection,
     retry: bool,
     write: bool,
     tx: SyncSender<Result<ResponseValue<T>>>,
 }
 
-impl<T, P> Request<T, P>
-    where P: Pool,
-          P::Connection: ReqlConnection,
-          T: 'static + Deserialize + Send + Debug,
+impl<T, S> Request<T, S>
+    where S: Session,
+          S::Connection: ReqlConnection,
+          T: Deserialize + Send,
 {
-    pub fn new(pool: P, tx: SyncSender<Result<ResponseValue<T>>>) -> Result<Request<T, P>>
+    pub fn new(pool: S, tx: SyncSender<Result<ResponseValue<T>>>) -> Result<Request<T, S>>
     {
         let conn = pool.get()?;
         Ok(Request{
