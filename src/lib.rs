@@ -18,7 +18,6 @@ pub mod errors;
 
 use std::collections::BTreeMap;
 
-use serde_json::value::{Value, Map};
 use protobuf::repeated::RepeatedField;
 use protobuf::ProtobufEnum;
 use proto::{
@@ -30,10 +29,6 @@ use proto::{
 
 pub type Result<T> = ::std::result::Result<T, errors::Error>;
 
-type Array = Vec<Term>;
-
-type Object = Map<String, Term>;
-
 pub trait IsDatum {
     fn is_datum(&self) -> bool;
 }
@@ -44,72 +39,6 @@ pub trait IsEmpty {
 
 pub trait Encode {
     fn encode(&self) -> String;
-}
-
-pub trait Decode {
-    fn decode(&self) -> Value;
-}
-
-#[derive(Debug, Clone)]
-pub struct QueryInfo {
-    db_set: bool,
-    query: String,
-    op: String,
-}
-
-impl QueryInfo {
-    pub fn db_set(&self) -> bool {
-        self.db_set
-    }
-
-    /*
-    fn query(&self) -> String {
-        self.query.to_string()
-    }
-
-    fn cmd_type(&self) -> String {
-        self.op.to_string()
-    }
-    */
-}
-
-pub trait Info {
-    fn info(&self) -> QueryInfo;
-}
-
-impl Info for Term {
-    fn info(&self) -> QueryInfo {
-        let mut inf = QueryInfo {
-            db_set: false,
-            query: String::new(),
-            op: String::from("read"),
-        };
-        let cmd = self.get_field_type()
-            .descriptor()
-            .name();
-        if cmd == "INSERT" {
-            inf.op = String::from("INSERT");
-        } else if cmd == "CHANGES" {
-            inf.op = String::from("CHANGES");
-        } else if cmd == "DB" {
-            inf.db_set = true;
-        }
-        inf.query.push_str(&format!(".{}(arg)", cmd));
-        let terms = self.get_args();
-        if !terms.is_empty() {
-            for term in terms {
-                let tinf = term.info();
-                if tinf.db_set {
-                    inf.db_set = true;
-                }
-                inf.query.push_str(&tinf.query);
-                if tinf.op != "read" {
-                    inf.op = tinf.op;
-                }
-            }
-        }
-        inf
-    }
 }
 
 impl IsDatum for Term {
