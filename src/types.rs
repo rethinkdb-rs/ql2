@@ -440,7 +440,7 @@ impl Command {
 }
 
 impl Term {
-    fn from_json<T: ToJson>(t: T) -> Term {
+    pub fn from_json<T: ToJson>(t: T) -> Term {
         // Datum
         let mut datum = Datum::new();
         match t.to_json() {

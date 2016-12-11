@@ -208,8 +208,8 @@ impl Encode for Term {
     }
 }
 
-impl From<BTreeMap<String, Term>> for Term {
-    fn from(t: BTreeMap<String, Term>) -> Term {
+impl<'a> From<BTreeMap<&'a str, Term>> for Term {
+    fn from(t: BTreeMap<&'a str, Term>) -> Term {
         let mut term = Term::new();
         let mut args = Vec::new();
         for (name, arg) in t.into_iter() {
