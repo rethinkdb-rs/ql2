@@ -489,11 +489,17 @@ impl<T, S> Request<T, S>
                         let tx = self.tx.clone();
                         tx.send(Ok(ResponseValue::Read(v)))?;
                     }
+                }
+                // Send unexpected query responses
+                // This is not an error according to the database
+                // but the caller wasn't expecting such a response
+                // so we just return it raw.
+                else if let Ok(data) = from_value::<Vec<Value>>(result.r.clone()) {
+                    for v in data {
+                        let tx = self.tx.clone();
+                        tx.send(Ok(ResponseValue::Raw(v)))?;
+                    }
                 } else {
-                    // Send unexpected query response
-                    // This is not an error according to the database
-                    // but the caller wasn't expecting such a response
-                    // so we just return it raw.
                     let tx = self.tx.clone();
                     tx.send(Ok(ResponseValue::Raw(result.r.clone())))?;
                 }
