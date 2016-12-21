@@ -1,7 +1,9 @@
-use std::string::String as StdString;
+use std::string;
 
-use proto::{Term, Datum, Term_TermType as TermType, Term_AssocPair as TermPair,
-            Datum_DatumType as DatumType, Datum_AssocPair as DatumPair};
+use proto::{Term, Datum,
+    Term_TermType as TermType,
+    Datum_DatumType as DatumType,
+    Datum_AssocPair as DatumPair};
 
 use protobuf::repeated::RepeatedField;
 use serde_json::value::{ToJson, Value};
@@ -25,28 +27,6 @@ macro_rules! implement {
         impl From<Term> for Selection<$dt> {
             fn from(t: Term) -> Selection<$dt> {
                 Selection::<$dt>($dt(t))
-            }
-        }
-    };
-
-    ($(#[$attr:meta])* pub struct Command) => {
-        $(
-            #[$attr]
-        )*
-        #[derive(Debug, Clone)]
-        pub struct Command(Term);
-
-        impl DataType for Command {}
-
-        impl From<Command> for Term {
-            fn from(t: Command) -> Term {
-                t.0
-            }
-        }
-
-        impl From<Term> for Command {
-            fn from(t: Term) -> Command {
-                Command(t)
             }
         }
     };
@@ -284,18 +264,6 @@ pub type ObjectSelection = Selection<Object>;
 pub type ArraySelection = Selection<Array>;
 pub type StreamSelection = Selection<Stream>;
 
-implement! {
-    pub struct Command
-}
-
-implement! {
-    pub struct PrimaryKey
-}
-
-implement! {
-    pub struct SecondaryKey
-}
-
 impl<T> From<T> for Object
     where T: ToJson
 {
@@ -306,7 +274,7 @@ impl<T> From<T> for Object
 }
 
 impl<T> From<T> for String
-    where T: Into<StdString>
+    where T: Into<string::String>
 {
     fn from(t: T) -> String {
         let mut datum = Datum::new();
@@ -330,112 +298,6 @@ impl<T> From<T> for Number
         output.0.set_field_type(TermType::DATUM);
         output.0.set_datum(datum);
         output
-    }
-}
-
-macro_rules! key_from_dt {
-    ($T:ty) => {
-        impl From<$T> for PrimaryKey {
-            fn from(t: $T) -> PrimaryKey {
-                let term: Term = t.into();
-                From::from(term)
-            }
-        }
-
-        impl From<$T> for SecondaryKey {
-            fn from(t: $T) -> SecondaryKey {
-                let term: Term = t.into();
-                From::from(term)
-            }
-        }
-    }
-}
-
-key_from_dt!{ String }
-key_from_dt!{ Number }
-key_from_dt!{ Bool }
-
-impl<'a> From<&'a str> for PrimaryKey {
-    fn from(t: &'a str) -> PrimaryKey {
-        let dt = String::from(t);
-        From::from(dt)
-    }
-}
-
-impl<'a> From<&'a str> for SecondaryKey {
-    fn from(t: &'a str) -> SecondaryKey {
-        let dt = String::from(t);
-        From::from(dt)
-    }
-}
-
-macro_rules! key_from_st {
-    ( $T:ident ) => {
-        impl From<$T> for PrimaryKey {
-            fn from(t: $T) -> PrimaryKey {
-                let term = Term::from_json(t);
-                From::from(term)
-            }
-        }
-
-        impl From<$T> for SecondaryKey {
-            fn from(t: $T) -> SecondaryKey {
-                let term = Term::from_json(t);
-                From::from(term)
-            }
-        }
-    };
-}
-
-key_from_st!{ StdString }
-key_from_st!{ bool }
-key_from_st!{ f32 }
-key_from_st!{ i32 }
-key_from_st!{ u32 }
-key_from_st!{ f64 }
-key_from_st!{ i64 }
-key_from_st!{ u64 }
-
-impl Command {
-    pub fn new(cmd_type: TermType, prev_cmd: Option<Term>) -> Command {
-        let mut term = Term::new();
-        term.set_field_type(cmd_type);
-        if let Some(cmd) = prev_cmd {
-            let args = RepeatedField::from_vec(vec![cmd]);
-            term.set_args(args);
-        }
-        Command(term)
-    }
-
-    pub fn with_args(&mut self, args: Term) -> &mut Self {
-        self.0.mut_args().push(args);
-        self
-    }
-
-    pub fn with_opts(&mut self, opts: Object) -> &mut Self {
-        let mut opts: Term = opts.into();
-        if opts.has_datum() {
-            let mut datum = opts.take_datum();
-            let pairs = datum.take_r_object().into_vec();
-            for mut pair in pairs {
-                if pair.has_key() {
-                    let mut term_pair = TermPair::new();
-                    term_pair.set_key(pair.take_key());
-                    let mut val = Term::new();
-                    val.set_field_type(TermType::DATUM);
-                    val.set_datum(pair.take_val());
-                    term_pair.set_val(val);
-                    self.0.mut_optargs().push(term_pair);
-                }
-            }
-        }
-        self
-    }
-
-    pub fn into<O>(self) -> O
-        where O: From<Term>
-    {
-        From::from(self.0)
     }
 }
 
