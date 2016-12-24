@@ -38,6 +38,7 @@ pub enum ResponseValue<T: Deserialize> {
     Write(WriteStatus),
     Read(T),
     Raw(Value),
+    None,
 }
 
 /// Connection Options
@@ -515,7 +516,14 @@ impl<T, S> Request<T, S>
                 else if let Ok(data) = from_value::<Vec<Value>>(result.r.clone()) {
                     for v in data {
                         let tx = self.tx.clone();
-                        tx.send(Ok(ResponseValue::Raw(v)))?;
+                        match v {
+                            Value::Null => {
+                                tx.send(Ok(ResponseValue::None))?;
+                            }
+                            value => {
+                                tx.send(Ok(ResponseValue::Raw(value)))?;
+                            }
+                        }
                     }
                 } else {
                     let tx = self.tx.clone();
