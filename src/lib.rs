@@ -156,6 +156,7 @@ impl<'a> From<BTreeMap<&'a str, Term>> for Term {
 impl From<Vec<Term>> for Term {
     fn from(t: Vec<Term>) -> Term {
         let mut term = Term::new();
+        term.set_field_type(TT::MAKE_ARRAY);
         let arr = RepeatedField::from_vec(t);
         term.set_args(arr);
         term
