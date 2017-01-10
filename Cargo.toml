@@ -12,7 +12,7 @@ authors = ["rushmorem <rushmore@webenchanter.com>"]
 build = "build.rs"
 
 [dependencies]
-protobuf = "1.0"
+protobuf = "1.1"
 serde = "0.8"
 serde_json = "0.8"
 scram = "0.1"
