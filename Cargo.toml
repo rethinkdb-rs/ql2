@@ -1,7 +1,7 @@
 [package]
 name = "ql2"
-description = "RethinkDB protocol and types"
-version = "1.1.0-alpha.1"
+description = "RethinkDB protocol"
+version = "1.1.0"
 license = "MIT/Apache-2.0"
 repository = "https://github.com/rust-rethinkdb/ql2"
 documentation = "https://docs.rs/ql2"
@@ -9,18 +9,5 @@ readme = "README.md"
 keywords = ["database", "rethinkdb", "reql", "ql2"]
 authors = ["rushmorem <rushmore@webenchanter.com>"]
 
-build = "build.rs"
-
 [dependencies]
 protobuf = "1.1"
-serde = "0.8"
-serde_json = "0.8"
-scram = "0.1"
-r2d2 = "0.7"
-quick-error = "1.1"
-byteorder = "0.5"
-bufstream = "0.1"
-uuid = { version = "0.3", features = ["v4", "serde", "use_std"] }
-
-[build-dependencies]
-serde_codegen = "0.8"
