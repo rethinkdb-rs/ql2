@@ -10,4 +10,5 @@ keywords = ["database", "rethinkdb", "reql", "ql2"]
 authors = ["rushmorem <rushmore@webenchanter.com>"]
 
 [dependencies]
-protobuf = "1.2"
+protobuf = ">= 1.4, < 1.6"
+uuid = { version = "0.6", features = ["v4", "serde"] }
