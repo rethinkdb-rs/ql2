@@ -1,5 +1,3 @@
 //! RethinkDB protocol implementation in Rust
 
-extern crate protobuf;
-
-pub mod proto;
+include!(concat!(env!("OUT_DIR"), "/ql2.rs"));
