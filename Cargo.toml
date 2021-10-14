@@ -14,8 +14,8 @@ authors = ["rushmorem <rushmore@webenchanter.com>"]
 doctest = false
 
 [dependencies]
-prost = "0.7.0"
-serde = { version = "1.0.125", features = ["derive"] }
+prost = "0.9.0"
+serde = { version = "1.0.130", features = ["derive"] }
 
 [build-dependencies]
-prost-build = "0.7.0"
+prost-build = "0.9.0"
